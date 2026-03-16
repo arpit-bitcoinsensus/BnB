@@ -416,6 +416,7 @@
         <a href="#" id="auth-toggle-signup" style="color: var(--info-color); text-decoration: none;">Don't have an account? Sign up</a>
         <a href="#" id="auth-toggle-reset" style="color: var(--info-color); text-decoration: none;">Forgot Password?</a>
         <a href="#" id="auth-toggle-login" style="color: var(--info-color); text-decoration: none; display: none;">Back to Login</a>
+        <a href="#" id="auth-toggle-setup" style="color: var(--text-muted); text-decoration: none; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">Missing Configuration? Setup API</a>
       </div>
     </div>
   </div>
@@ -516,6 +517,20 @@
       document.getElementById('auth-toggle-reset').style.display = 'inline-block';
       document.getElementById('auth-toggle-login').style.display = 'none';
       document.getElementById('login-error').style.display = 'none';
+    });
+
+    document.getElementById('auth-toggle-setup').addEventListener('click', (e) => {
+      e.preventDefault();
+      
+      // Pre-fill the modal with any existing config so they don't overwrite blindly
+      document.getElementById('input-client-id').value = state.clientId || '';
+      document.getElementById('input-store').value = state.storeUrl || '';
+      document.getElementById('input-token').value = state.apiToken || '';
+      // Supabase is read from global variables initialized at load
+      document.getElementById('input-supabase-url').value = localStorage.getItem('supabase_url') || '';
+      document.getElementById('input-supabase-key').value = localStorage.getItem('supabase_key') || '';
+      
+      document.getElementById('setup-modal').classList.add('active');
     });
 
     // Main Auth Submit Handler
@@ -667,8 +682,9 @@
       // sbClient = window.supabase.createClient(sbUrl, sbKey); // This is now initialized globally
       
       document.getElementById('setup-modal').classList.remove('active');
-      updateHeader();
-      fetchCurrentView();
+      
+      // Force page reload so the Supabase Auth SDK successfully reconstructs with your new keys
+      window.location.reload();
     });
 
     function updateHeader() {
@@ -676,6 +692,7 @@
       const syncBtn = document.getElementById('btn-sync-now');
       const setupBtn = document.getElementById('btn-setup'); // Assuming this is the element that needs to change
       const logoutBtn = document.getElementById('btn-logout');
+      const authSetupLink = document.getElementById('auth-toggle-setup'); // New: Setup link on login overlay
 
       if (state.user) {
         connBadge.style.display = 'inline-block';
