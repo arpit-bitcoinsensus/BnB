@@ -453,29 +453,39 @@
       user: null
     };
 
-    // Initialize Supabase. For full authentication support, you must replace 
-    // YOUR_SUPABASE_URL and YOUR_SUPABASE_ANON_KEY with your project strings.
-    const SUPABASE_URL = "YOUR_SUPABASE_URL" !== "YOUR_SUPABASE_URL" ? "YOUR_SUPABASE_URL" : (localStorage.getItem('supabase_url') || '').replace('superbase.co', 'supabase.co');
-    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY" !== "YOUR_SUPABASE_ANON_KEY" ? "YOUR_SUPABASE_ANON_KEY" : (localStorage.getItem('supabase_key') || '');
+    // Initialize Supabase ONLY if valid credentials exist in localStorage
+    const _sbUrl = (localStorage.getItem('supabase_url') || '').replace('superbase.co', 'supabase.co').trim();
+    const _sbKey = (localStorage.getItem('supabase_key') || '').trim();
+    const supabaseConfigured = !!((_sbUrl.startsWith('https://') && _sbKey.length > 10));
 
-    let sbClient = supabase.createClient(SUPABASE_URL || 'https://dummy.supabase.co', SUPABASE_ANON_KEY || 'dummy_key');
+    let sbClient = null;
 
-    // Supabase Auth Event Listener
-    sbClient.auth.onAuthStateChange((event, session) => {
-      if (session && session.user) {
-        state.user = session.user;
-        document.getElementById('login-overlay').style.display = 'none';
-        updateHeader();
-        
-        // Auto-fetch data upon successful login
-        setupViewInputs();
-        fetchCurrentView();
-      } else {
-        state.user = null;
-        document.getElementById('login-overlay').style.display = 'flex';
-        updateHeader();
+    if (supabaseConfigured) {
+      sbClient = supabase.createClient(_sbUrl, _sbKey);
+
+      // Supabase Auth State Listener (only when configured)
+      sbClient.auth.onAuthStateChange((event, session) => {
+        if (session && session.user) {
+          state.user = session.user;
+          document.getElementById('login-overlay').style.display = 'none';
+          updateHeader();
+          setupViewInputs();
+          fetchCurrentView();
+        } else {
+          state.user = null;
+          document.getElementById('login-overlay').style.display = 'flex';
+          updateHeader();
+        }
+      });
+    } else {
+      // No config yet: show helpful warning immediately (DOM is ready since script is at bottom of page)
+      const errElInit = document.getElementById('login-error');
+      if (errElInit) {
+        errElInit.textContent = 'First-time setup required. Please click "Missing Configuration? Setup API" below.';
+        errElInit.style.color = 'var(--warning-color)';
+        errElInit.style.display = 'block';
       }
-    });
+    }
 
     // Auth Mode Toggles
     let authMode = 'login'; // login, signup, reset
@@ -643,7 +653,7 @@
     // });
     
     document.getElementById('btn-logout').addEventListener('click', async () => {
-      await sbClient.auth.signOut();
+      if (sbClient) await sbClient.auth.signOut();
       state.user = null;
       document.getElementById('login-overlay').style.display = 'flex';
       updateHeader();
