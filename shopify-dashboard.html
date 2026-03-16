@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shopify Analytics Dashboard</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap');
+
+    :root {
+      --bg-color-1: #0f172a;
+      --bg-color-2: #1e1b4b;
+      --surface: rgba(30, 41, 59, 0.6);
+      --surface-hover: rgba(51, 65, 85, 0.8);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: rgba(255, 255, 255, 0.1);
+      --primary: #3b82f6;
+      --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      --primary-gradient-hover: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+      --profit-color: #10b981;
+      --loss-color: #ef4444;
+      --warning-color: #f59e0b;
+      --info-color: #0ea5e9;
+      --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, var(--bg-color-1), var(--bg-color-2));
+      background-attachment: fixed;
+      color: var(--text-main);
+    }
+
+    h1, h2, h3, .metric-value, .tag-count, .tab { font-family: 'Outfit', sans-serif; }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    .card, .metric-card, .controls-bar, .modal, .day-block {
+      background: var(--surface);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      box-shadow: var(--glass-shadow);
+    }
+
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; gap: 16px; }
+    h1 { margin: 0; font-size: 28px; font-weight: 700; background: var(--primary-gradient); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.5px; }
+    .header-controls { display: flex; align-items: center; gap: 12px; }
+    
+    .badge { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; border: 1px solid var(--border); backdrop-filter: blur(8px); }
+    .badge.demo { background: rgba(239, 68, 68, 0.15); color: var(--loss-color); border-color: rgba(239, 68, 68, 0.3); }
+    .badge.live { background: rgba(16, 185, 129, 0.15); color: var(--profit-color); border-color: rgba(16, 185, 129, 0.3); }
+
+    button {
+      background: var(--surface); color: var(--text-main); border: 1px solid var(--border);
+      padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;
+      font-family: inherit; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); backdrop-filter: blur(8px);
+    }
+    button:hover { background: var(--surface-hover); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    button.primary { background: var(--primary-gradient); border: none; color: white; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4); }
+    button.primary:hover { background: var(--primary-gradient-hover); box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6); }
+
+    /* Modal */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(5px); }
+    .modal-overlay.active { display: flex; animation: fadeIn 0.3s ease; }
+    .modal { padding: 32px; border-radius: 16px; width: 100%; max-width: 400px; }
+    .modal h2 { margin-top: 0; font-size: 24px; margin-bottom: 8px; }
+    .modal p { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: var(--text-muted); }
+    .form-group input { width: 100%; padding: 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: var(--text-main); border-radius: 8px; box-sizing: border-box; transition: border-color 0.2s; }
+    .form-group input:focus { outline: none; border-color: var(--primary); background: rgba(0,0,0,0.3); }
+    .form-group .error { color: var(--loss-color); font-size: 12px; margin-top: 6px; display: none; }
+
+    /* Tabs */
+    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 32px; gap: 8px; }
+    .tab { padding: 12px 24px; cursor: pointer; color: var(--text-muted); border-bottom: 3px solid transparent; font-size: 16px; font-weight: 600; transition: all 0.2s; }
+    .tab:hover { color: var(--text-main); }
+    .tab.active { color: var(--text-main); border-bottom-color: var(--primary); text-shadow: 0 0 10px rgba(59,130,246,0.5); }
+
+    .view-content { display: none; margin-bottom: 40px; animation: fadeInUp 0.4s ease forwards; }
+    .view-content.active { display: block; }
+
+    /* Controls bar */
+    .controls-bar { display: flex; gap: 16px; align-items: center; margin-bottom: 24px; padding: 16px 20px; border-radius: 12px; }
+    
+    .date-picker { display: flex; align-items: center; gap: 8px; }
+    .date-picker input { padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: white; color-scheme: dark; border-radius: 8px; outline: none; font-family: inherit; }
+    .date-picker input:focus { border-color: var(--primary); }
+    .date-picker button { padding: 10px 14px; }
+
+    /* Grid Layouts */
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 20px; margin-bottom: 32px; }
+    .metric-card { padding: 20px; border-radius: 12px; display: flex; flex-direction: column; transition: transform 0.3s, box-shadow 0.3s; }
+    .metric-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.2); }
+    .metric-value { font-size: 28px; font-weight: 700; margin-top: 12px; letter-spacing: -0.5px; }
+    .metric-label { font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+
+    .text-profit { color: var(--profit-color); text-shadow: 0 0 15px rgba(16,185,129,0.3); }
+    .text-loss { color: var(--loss-color); text-shadow: 0 0 15px rgba(239,68,68,0.3); }
+
+    .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+    .card { border-radius: 16px; padding: 24px; transition: transform 0.3s; }
+    .card h3 { margin-top: 0; margin-bottom: 20px; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
+
+    /* Tags Grid */
+    .tags-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .tag-item { background: rgba(0,0,0,0.2); padding: 16px 12px; border-radius: 10px; text-align: center; border: 1px solid var(--border); transition: transform 0.2s; }
+    .tag-item:hover { transform: scale(1.03); background: rgba(0,0,0,0.3); }
+    .tag-count { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+    .tag-name { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+
+    .tag-delivered .tag-count { color: var(--profit-color); }
+    .tag-canceled .tag-count { color: var(--loss-color); }
+    .tag-attempted-delivery .tag-count, .tag-payment-pending .tag-count { color: var(--warning-color); }
+    .tag-in-transit .tag-count { color: var(--info-color); }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--text-muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { font-size: 14px; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr { transition: background 0.2s; }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+    .pnll-table td:nth-child(2) { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+    .pnll-table tr.total-row td { font-weight: 700; font-size: 18px; border-top: 2px solid rgba(255,255,255,0.15); padding-top: 20px; }
+
+    .inline-input { background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: white; padding: 8px 12px; width: 100px; text-align: right; border-radius: 6px; font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.2s; }
+    .inline-input:focus { border-color: var(--primary); }
+    .inline-btn { padding: 8px 12px; font-size: 13px; margin-left: 12px; font-weight: 600; border-radius: 6px; }
+
+    .orders-table-wrapper { max-height: 400px; overflow-y: auto; margin: -24px; margin-top: 0; padding: 0 24px 24px; }
+
+    .order-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .order-tag { font-size: 11px; font-weight: 500; padding: 4px 8px; background: rgba(0,0,0,0.3); border-radius: 6px; border: 1px solid var(--border); }
+
+    /* Scrollable Daily Feed */
+    .daily-feed-container { display: flex; flex-direction: column; gap: 32px; }
+    .day-block { border-radius: 16px; padding: 24px; }
+    .day-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
+    .day-header h2 { margin: 0; font-size: 22px; color: var(--text-main); }
+    .day-actions { display: flex; gap: 12px; }
+    
+    .expand-btn { background: transparent; border: 1px solid var(--border); backdrop-filter: none; padding: 6px 12px; }
+    .expand-btn:hover { background: rgba(255,255,255,0.05); }
+
+    /* Loading Overlay */
+    .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15,23,42,0.85); display: none; justify-content: center; align-items: center; z-index: 500; flex-direction: column; backdrop-filter: blur(8px); }
+    .loading-overlay.active { display: flex; animation: fadeIn 0.3s ease; }
+    .spinner { width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .empty-state { padding: 60px; text-align: center; color: var(--text-muted); font-size: 16px; border-radius: 12px; background: rgba(0,0,0,0.2); }
+    .full-width { grid-column: 1 / -1; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Shopify Analytics</h1>
+      <div class="header-controls">
+        <span id="conn-badge" class="badge live" style="display:none;"></span>
+        <button id="btn-sync-now" class="primary" style="display:none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
+            <path d="M21.5 2v6h-6M2.13 15.57a9 9 0 0 0 16.59 2.07L21.5 14M2.5 22v-6h6M22.39 8.35A9 9 0 0 0 6.64 5.92L2.5 10"/>
+          </svg>
+          Sync Data
+        </button>
+        <button id="btn-setup">Setup API</button>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <div class="tab active" data-target="daily">Daily</div>
+      <div class="tab" data-target="weekly">Weekly</div>
+      <div class="tab" data-target="monthly">Monthly</div>
+      <div class="tab" data-target="custom">Custom</div>
+      <div class="tab" data-target="all-time">All Time</div>
+    </div>
+
+    <!-- DAILY VIEW (Scrollable Feed) -->
+    <div id="view-daily" class="view-content active">
+      <div class="controls-bar">
+        <div class="date-picker">
+          <label style="font-size: 14px; color: var(--text-muted); font-weight: 500;">Start Date:</label>
+          <input type="date" id="daily-start-date">
+        </div>
+        <div class="date-picker">
+          <label style="font-size: 14px; color: var(--text-muted); font-weight: 500;">End Date:</label>
+          <input type="date" id="daily-end-date">
+        </div>
+        <button class="primary" id="btn-fetch-daily">Fetch Feed</button>
+        <span id="daily-last-updated" style="color:var(--text-muted); font-size:12px; margin-left:auto; font-weight:500;"></span>
+      </div>
+
+      <div id="daily-feed" class="daily-feed-container">
+        <!-- Day blocks rendered by JS -->
+      </div>
+    </div>
+
+    <!-- WEEKLY VIEW -->
+    <div id="view-weekly" class="view-content">
+      <div class="controls-bar">
+        <div class="date-picker">
+          <label style="font-size: 14px">Select Week: </label>
+          <input type="date" id="weekly-date">
+        </div>
+        <button class="primary" id="btn-fetch-weekly">Fetch Orders</button>
+        <span id="weekly-range" style="margin-left:auto; font-size: 14px; font-weight:500;"></span>
+      </div>
+
+      <div class="metrics-grid" id="weekly-metrics">
+        <!-- Rendered by JS -->
+      </div>
+
+      <div class="main-grid">
+        <div class="card full-width">
+          <h3>Weekly Trend</h3>
+          <div style="position:relative; width:100%; height:240px">
+            <canvas id="weeklyChart"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Daily Breakdown</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Orders</th>
+                <th>Delivered</th>
+                <th>Canceled</th>
+                <th>Net P&L</th>
+              </tr>
+            </thead>
+            <tbody id="weekly-breakdown-tbody">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h3>Weekly P&L <span id="weekly-pl-badge" class="badge"></span></h3>
+          <table class="pnll-table" id="weekly-pl-table">
+            <!-- Rendered by JS -->
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- MONTHLY VIEW -->
+    <div id="view-monthly" class="view-content">
+      <div class="controls-bar">
+        <select id="monthly-month" style="padding: 8px; background:var(--bg-color); border:1px solid var(--border); color:white; border-radius:4px;">
+          <!-- Options added by JS -->
+        </select>
+        <select id="monthly-year" style="padding: 8px; background:var(--bg-color); border:1px solid var(--border); color:white; border-radius:4px;">
+          <!-- Options added by JS -->
+        </select>
+        <button class="primary" id="btn-fetch-monthly">Fetch Orders</button>
+      </div>
+
+      <div class="metrics-grid" id="monthly-metrics">
+        <!-- Rendered by JS -->
+      </div>
+
+      <div class="main-grid">
+        <div class="card full-width">
+          <h3>Monthly Trend</h3>
+          <div style="position:relative; width:100%; height:280px">
+            <canvas id="monthlyChart"></canvas>
+          </div>
+        </div>
+
+        <div class="card full-width">
+          <h3>Monthly P&L <span id="monthly-pl-badge" class="badge"></span></h3>
+          <table class="pnll-table" id="monthly-pl-table">
+            <!-- Rendered by JS -->
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALL TIME VIEW -->
+    <div id="view-all-time" class="view-content">
+      <div class="controls-bar glass">
+        <div style="flex: 1;">
+          <h2 style="margin: 0; font-size: 20px;">Lifetime Analytics</h2>
+          <p style="margin: 4px 0 0 0; color: var(--text-muted); font-size: 14px;" id="all-time-range">Loading...</p>
+        </div>
+      </div>
+      <div class="metrics-grid" id="all-time-metrics"></div>
+      
+      <div class="card glass">
+        <h3>Performance by Month</h3>
+        <table class="pnll-table" style="margin-top: 10px;">
+          <thead>
+            <tr>
+              <th style="text-align:left; padding-bottom:8px; border-bottom:1px solid var(--border-color);">Month</th>
+              <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color);">Orders</th>
+              <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color);">Delivered</th>
+              <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color);">Canceled</th>
+              <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color); text-align:right;">Net P&L</th>
+            </tr>
+          </thead>
+          <tbody id="all-time-breakdown-tbody"></tbody>
+        </table>
+      </div>
+      
+      <div class="card glass">
+        <h3 style="display: flex; justify-content: space-between; align-items: center;">
+          All-Time Profit & Loss
+          <span class="badge" id="all-time-pl-badge"></span>
+        </h3>
+        <table class="pnll-table" id="all-time-pl-table">
+          <!-- Rendered by JS -->
+        </table>
+      </div>
+
+    <!-- CUSTOM DATE RANGE VIEW -->
+    <div id="view-custom" class="view-content">
+      <div class="controls-bar glass">
+        <div style="flex: 1; display: flex; align-items: center; gap: 15px;">
+          <div>
+            <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">From</label>
+            <input type="date" id="custom-from" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-hover); color: var(--text-color);">
+          </div>
+          <div>
+            <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">To</label>
+            <input type="date" id="custom-to" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-hover); color: var(--text-color);">
+          </div>
+          <button id="btn-apply-custom" style="align-self: flex-end; padding: 7px 16px;">Apply</button>
+        </div>
+      </div>
+      
+      <div class="metrics-grid" id="custom-metrics"></div>
+      
+      <div class="card glass">
+        <h3>Performance Breakdown</h3>
+        <table class="pnll-table" style="margin-top: 10px;">
+          <thead>
+            <tr>
+              <th style="text-align:left; padding-bottom:8px; border-bottom:1px solid var(--border-color);">Month</th>
+              <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color);">Orders</th>
+              <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color);">Delivered</th>
+              <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color);">Canceled</th>
+              <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color); text-align:right;">Net P&L</th>
+            </tr>
+          </thead>
+          <tbody id="custom-breakdown-tbody"></tbody>
+        </table>
+      </div>
+      
+      <div class="card glass">
+        <h3 style="display: flex; justify-content: space-between; align-items: center;">
+          Custom Profit & Loss
+          <span class="badge" id="custom-pl-badge"></span>
+        </h3>
+        <table class="pnll-table" id="custom-pl-table">
+          <!-- Rendered by JS -->
+        </table>
+      </div>
+    </div>
+    </div>
+
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+    <div style="font-weight:500;">Fetching Shopify Orders...</div>
+    <div style="font-size:12px; color:var(--text-muted); margin-top:8px;" id="loading-msg"></div>
+  </div>
+
+  <!-- Setup Modal -->
+  <div class="modal-overlay" id="setup-modal">
+    <div class="modal">
+      <h2>API Setup</h2>
+      <p>Enter your Shopify and Supabase details. Database credentials are saved locally.</p>
+      
+      <div class="form-group">
+        <label>Shopify Store URL</label>
+        <input type="text" id="input-store" placeholder="e.g. mystore.myshopify.com">
+        <div class="error" id="err-store">Valid store URL required.</div>
+      </div>
+      
+      <div class="form-group">
+        <label>Shopify Client ID (from Dev Dashboard)</label>
+        <input type="text" id="input-client-id" placeholder="e.g. 1cc7e76be3c1b4e3ba25bff8eba0159b">
+        <div class="error" id="err-client-id">Client ID required when using shpss_ secret.</div>
+      </div>
+
+      <div class="form-group">
+        <label>Shopify Client Secret / Access Token</label>
+        <input type="password" id="input-token" placeholder="shpat_... or shpss_...">
+        <div class="error" id="err-token">Token required for live sync.</div>
+      </div>
+
+      <div class="form-group" style="margin-top: 16px;">
+        <label>Supabase URL</label>
+        <input type="text" id="input-supabase-url" placeholder="https://xxxx.supabase.co">
+        <div class="error" id="err-supabase-url">Supabase URL required.</div>
+      </div>
+
+      <div class="form-group">
+        <label>Supabase Anon Key</label>
+        <input type="password" id="input-supabase-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+        <div class="error" id="err-supabase-key">Supabase key required.</div>
+      </div>
+
+      <p style="font-size: 12px; color: var(--warning-color);">Note: Direct Shopify API calls require a CORS proxy running locally.</p>
+
+      <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
+        <button id="btn-cancel-setup">Cancel</button>
+        <button class="primary" id="btn-save-setup">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- UMD Build of Chart.js & Supabase JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  
+  <script>
+    // Constants
+    const PRODUCT_COST = 555;
+    const SHIPPING_COST = 135;
+    const STATUS_TAGS = ['Delivered','Canceled','Attempted Delivery','In Transit','Paid','Payment Pending','Unfulfilled','Fulfilled'];
+    const CHART_COLORS = {
+      'Delivered': '#4caf50',
+      'Canceled': '#f44336',
+      'Attempted Delivery': '#e07a10',
+      'In Transit': '#2196f3',
+      'Paid': '#4caf50',
+      'Payment Pending': '#e07a10',
+      'Unfulfilled': '#f44336',
+      'Fulfilled': '#4caf50',
+      'Other': '#757575'
+    };
+
+    // State
+    let state = {
+      view: 'daily',
+      clientId: localStorage.getItem('shopify_client_id') || '',
+      storeUrl: localStorage.getItem('shopify_store_url') || '',
+      apiToken: localStorage.getItem('shopify_api_token') || '',
+      supabaseUrl: (localStorage.getItem('supabase_url') || '').replace('superbase.co', 'supabase.co'),
+      supabaseKey: localStorage.getItem('supabase_key') || '',
+      orders: [], // Current view orders
+      adCosts: {}, // Loaded from Supabase for current view
+      charts: { daily: null, weekly: null, monthly: null }
+    };
+
+    let sbClient = null;
+    if(state.supabaseUrl && state.supabaseKey) {
+      sbClient = window.supabase.createClient(state.supabaseUrl, state.supabaseKey);
+    }
+
+    // Date Utilities
+    function toDateStr(d) {
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    }
+    function getWeekStart(d) {
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const start = new Date(new Date(d).setDate(diff));
+      start.setHours(0,0,0,0);
+      return start;
+    }
+    function fmt(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
+    function fmtK(n) { return n >= 1000 ? '₹' + (n / 1000).toFixed(1) + 'K' : '₹' + Math.round(n); }
+    function getTagClass(t) {
+      return 'tag-' + t.toLowerCase().replace(/\s+/g, '-');
+    }
+
+    // Storage (Supabase)
+    async function saveAdCost(dateStr, cost) {
+      if(!sbClient) {
+        state.adCosts[dateStr] = parseFloat(cost) || 0;
+        return;
+      }
+      const val = parseFloat(cost) || 0;
+      state.adCosts[dateStr] = val;
+      const { error } = await sbClient.from('ad_spend').upsert({ date: dateStr, amount: val });
+      if(error) console.error("Error saving ad spend:", error);
+    }
+
+    async function loadAdCosts(minDate, maxDate) {
+      if(!sbClient) return;
+      const { data, error } = await sbClient
+        .from('ad_spend')
+        .select('date, amount')
+        .gte('date', minDate)
+        .lte('date', maxDate);
+      
+      if(!error && data) {
+        state.adCosts = {}; // reset
+        data.forEach(row => state.adCosts[row.date] = row.amount);
+      }
+    }
+
+    // Modal Logic
+    document.getElementById('btn-setup').addEventListener('click', () => {
+      document.getElementById('input-client-id').value = state.clientId;
+      document.getElementById('input-store').value = state.storeUrl;
+      document.getElementById('input-token').value = state.apiToken;
+      document.getElementById('input-supabase-url').value = state.supabaseUrl;
+      document.getElementById('input-supabase-key').value = state.supabaseKey;
+      document.getElementById('setup-modal').classList.add('active');
+    });
+    
+    document.getElementById('btn-cancel-setup').addEventListener('click', () => {
+      document.getElementById('setup-modal').classList.remove('active');
+    });
+    
+    document.getElementById('btn-save-setup').addEventListener('click', () => {
+      const clientId = document.getElementById('input-client-id').value.trim();
+      const url = document.getElementById('input-store').value.trim();
+      const token = document.getElementById('input-token').value.trim();
+      let sbUrl = document.getElementById('input-supabase-url').value.trim();
+      const sbKey = document.getElementById('input-supabase-key').value.trim();
+      
+      // Auto-correct common "superbase.co" user typo
+      sbUrl = sbUrl.replace('superbase.co', 'supabase.co');
+      
+      let valid = true;
+      if (!url) { document.getElementById('err-store').style.display = 'block'; valid = false; } else { document.getElementById('err-store').style.display = 'none'; }
+      if (!token) { document.getElementById('err-token').style.display = 'block'; valid = false; } else { document.getElementById('err-token').style.display = 'none'; }
+      if (token.startsWith('shpss_') && !clientId) { document.getElementById('err-client-id').style.display = 'block'; valid = false; } else { document.getElementById('err-client-id').style.display = 'none'; }
+      if (!sbUrl) { document.getElementById('err-supabase-url').style.display = 'block'; valid = false; } else { document.getElementById('err-supabase-url').style.display = 'none'; }
+      if (!sbKey) { document.getElementById('err-supabase-key').style.display = 'block'; valid = false; } else { document.getElementById('err-supabase-key').style.display = 'none'; }
+      
+      if (!valid) return;
+
+      state.storeUrl = url;
+      state.clientId = clientId;
+      state.apiToken = token;
+      state.supabaseUrl = sbUrl;
+      state.supabaseKey = sbKey;
+      
+      localStorage.setItem('shopify_store_url', url);
+      localStorage.setItem('shopify_client_id', clientId);
+      localStorage.setItem('shopify_api_token', token);
+      localStorage.setItem('supabase_url', sbUrl);
+      localStorage.setItem('supabase_key', sbKey);
+      
+      sbClient = window.supabase.createClient(sbUrl, sbKey);
+      
+      document.getElementById('setup-modal').classList.remove('active');
+      updateHeader();
+      fetchCurrentView();
+    });
+
+    function updateHeader() {
+      const connBadge = document.getElementById('conn-badge');
+      const syncBtn = document.getElementById('btn-sync-now');
+      if (state.storeUrl) {
+        connBadge.style.display = 'inline-block';
+        connBadge.textContent = state.storeUrl;
+        syncBtn.style.display = 'inline-block';
+      } else {
+        connBadge.style.display = 'none';
+        syncBtn.style.display = 'none';
+      }
+    }
+
+    document.getElementById('btn-sync-now').addEventListener('click', () => {
+      fetchCurrentView();
+    });
+
+    // Tab Logic
+    document.querySelectorAll('.tab').forEach(t => {
+      t.addEventListener('click', (e) => {
+        document.querySelectorAll('.tab').forEach(tb => tb.classList.remove('active'));
+        document.querySelectorAll('.view-content').forEach(v => v.classList.remove('active'));
+        e.target.classList.add('active');
+        state.view = e.target.dataset.target;
+        document.getElementById(`view-${state.view}`).classList.add('active');
+        // Initial setup for view if needed
+        setupViewInputs();
+        fetchCurrentView();
+      });
+    });
+
+    function setupViewInputs() {
+      const now = new Date();
+      if (!document.getElementById('daily-start-date').value) {
+        let d = new Date(now);
+        d.setDate(d.getDate() - 6);
+        document.getElementById('daily-start-date').value = toDateStr(d);
+      }
+      if (!document.getElementById('daily-end-date').value) {
+        document.getElementById('daily-end-date').value = toDateStr(now);
+      }
+      if (!document.getElementById('weekly-date').value) {
+        document.getElementById('weekly-date').value = toDateStr(now);
+      }
+
+      // Populate months and years exactly once
+      const mSel = document.getElementById('monthly-month');
+      if(mSel.options.length === 0) {
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        months.forEach((m, i) => mSel.add(new Option(m, i)));
+        mSel.value = now.getMonth();
+        
+        const ySel = document.getElementById('monthly-year');
+        const cy = now.getFullYear();
+        for(let i=0; i<3; i++) ySel.add(new Option(cy-i, cy-i));
+      }
+    }
+
+    document.getElementById('btn-fetch-daily').addEventListener('click', fetchCurrentView);
+    document.getElementById('btn-fetch-weekly').addEventListener('click', fetchCurrentView);
+    document.getElementById('btn-fetch-monthly').addEventListener('click', fetchCurrentView);
+
+    function showLoading(msg) {
+      document.getElementById('loading').classList.add('active');
+      document.getElementById('loading-msg').textContent = msg || '';
+    }
+    function hideLoading() {
+      document.getElementById('loading').classList.remove('active');
+    }
+
+    // Data Processing Utils
+    function categorizeOrders(orders) {
+      const counts = {};
+      STATUS_TAGS.forEach(t => counts[t] = 0);
+      counts['Other'] = 0;
+
+      orders.forEach(o => {
+        const tags = (o.tags || '').split(',').map(t => t.trim().toLowerCase());
+        let matched = false;
+        STATUS_TAGS.forEach(st => {
+          if (tags.includes(st.toLowerCase())) { counts[st]++; matched = true; }
+        });
+        if (!matched) counts['Other']++;
+      });
+      return counts;
+    }
+
+    function getTotalRevenue(orders) {
+      return orders
+        .filter(o => (o.tags || '').toLowerCase().split(',').map(t => t.trim()).includes('delivered'))
+        .reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
+    }
+
+    function calcPL(revenue, deliveredCount, adCost) {
+      const productCost = deliveredCount * PRODUCT_COST;
+      const shippingCost = deliveredCount * SHIPPING_COST;
+      const totalCost = productCost + shippingCost + adCost;
+      const profit = revenue - totalCost;
+      return { revenue, productCost, shippingCost, adCost, totalCost, profit };
+    }
+
+    // Fetch API
+    async function syncShopifyToSupabase(minDate, maxDate) {
+      if(!sbClient) return;
+
+      // 1. Find the latest order we have for this date range in Supabase
+      const { data: latestOrder, error: sbErr } = await sbClient
+        .from('orders')
+        .select('created_at')
+        .gte('created_at', minDate)
+        .lte('created_at', maxDate)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      let fetchFrom = minDate;
+      if (!sbErr && latestOrder && latestOrder.length > 0) {
+        // We have some data. Only fetch newer orders from Shopify.
+        // Add 1 second to avoid duplicating the exact same order.
+        let dt = new Date(latestOrder[0].created_at);
+        dt.setSeconds(dt.getSeconds() + 1); 
+        fetchFrom = dt.toISOString();
+      }
+
+      // 2. Fetch missing orders from Shopify via Local Node Proxy
+      const proxyUrl = `http://localhost:3000/shopify-api/admin/api/2024-01/orders.json?status=any&created_at_min=${fetchFrom}&created_at_max=${maxDate}&limit=250`;
+      
+      try {
+        const response = await fetch(proxyUrl, {
+          method: 'GET',
+          headers: {
+            'X-Shopify-Access-Token': state.apiToken,
+            'X-Shopify-Client-Id': state.clientId,
+            'X-Shopify-Store-Url': state.storeUrl,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+        
+        // 3. Save new orders into Supabase
+        if(data.orders && data.orders.length > 0) {
+          const toInsert = data.orders.map(o => ({
+            id: o.id,
+            name: o.name,
+            created_at: o.created_at,
+            total_price: o.total_price,
+            tags: o.tags,
+            customer_fn: o.customer ? o.customer.first_name : null,
+            customer_ln: o.customer ? o.customer.last_name : null
+          }));
+
+          const { error: insertErr } = await sbClient.from('orders').upsert(toInsert, { onConflict: 'id' });
+          if(insertErr) console.error("Supabase insert error:", insertErr);
+        }
+      } catch (e) {
+        console.error("Shopify Sync Error:", e);
+        throw e;
+      }
+    }
+
+    async function fetchOrdersFromSupabase(minDate, maxDate) {
+      const { data, error } = await sbClient
+        .from('orders')
+        .select('*')
+        .gte('created_at', minDate)
+        .lte('created_at', maxDate)
+        .order('created_at', { ascending: false });
+        
+      if(error) throw error;
+
+      // Re-map column names to match what the UI expects (mimicking standard Shopify JSON struct)
+      return data.map(o => ({
+        id: o.id,
+        name: o.name,
+        created_at: o.created_at,
+        total_price: o.total_price,
+        tags: o.tags,
+        customer: { first_name: o.customer_fn, last_name: o.customer_ln }
+      }));
+    }
+
+    // Fetch Orchestrator
+    async function fetchCurrentView() {
+      if (!state.storeUrl || !state.apiToken || !state.supabaseUrl) {
+        alert("Please set up your API credentials first (Shopify & Supabase).");
+        document.getElementById('setup-modal').classList.add('active');
+        return;
+      }
+
+      showLoading('Syncing and loading orders...');
+
+      try {
+        let minDate, maxDate, dbMin, dbMax;
+        
+        if (state.view === 'daily') {
+          const startDateStr = document.getElementById('daily-start-date').value;
+          const endDateStr = document.getElementById('daily-end-date').value;
+          dbMin = startDateStr; dbMax = endDateStr;
+          minDate = `${startDateStr}T00:00:00`; maxDate = `${endDateStr}T23:59:59`;
+        } else if (state.view === 'weekly') {
+          const wDate = new Date(document.getElementById('weekly-date').value);
+          const wStart = getWeekStart(wDate);
+          const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate() + 6);
+          dbMin = toDateStr(wStart); dbMax = toDateStr(wEnd);
+          minDate = `${dbMin}T00:00:00`; maxDate = `${dbMax}T23:59:59`;
+        } else if (state.view === 'monthly') {
+          const y = parseInt(document.getElementById('monthly-year').value);
+          const m = parseInt(document.getElementById('monthly-month').value);
+          const mStart = new Date(y, m, 1);
+          const mEnd = new Date(y, m + 1, 0);
+          dbMin = toDateStr(mStart); dbMax = toDateStr(mEnd);
+          minDate = `${dbMin}T00:00:00`; maxDate = `${dbMax}T23:59:59`;
+        } else if (state.view === 'custom') {
+          dbMin = document.getElementById('custom-from').value;
+          dbMax = document.getElementById('custom-to').value;
+          
+          if (!dbMin || !dbMax) {
+            alert('Please select a valid "From" and "To" date.');
+            hideLoader();
+            return;
+          }
+          
+          minDate = `${dbMin}T00:00:00`; maxDate = `${dbMax}T23:59:59`;
+        } else if (state.view === 'all-time') {
+          // Hardcode starting epoch as requested
+          dbMin = '2026-02-25'; 
+          dbMax = '2026-03-17';
+          minDate = `${dbMin}T00:00:00`; maxDate = `${dbMax}T23:59:59`;
+        }
+
+        // 1. Sync missing data from Shopify into Supabase
+        try {
+          await syncShopifyToSupabase(minDate, maxDate);
+        } catch(e) {
+          // If Shopify fails (CORS etc), we will still try to load whatever is currently in Supabase.
+          console.warn("Shopify sync failed. Falling back to cached database data if available.");
+        }
+        // 2. Fetch everything locally from Supabase
+        state.orders = await fetchOrdersFromSupabase(minDate, maxDate);
+        // 3. Load Ad Spend from Supabase
+        await loadAdCosts(dbMin, dbMax);
+
+        // Render matching UI
+        if (state.view === 'daily') renderDaily(new Date(dbMin), new Date(dbMax));
+        else if (state.view === 'weekly') renderWeekly(new Date(dbMin), new Date(dbMax));
+        else if (state.view === 'monthly') renderMonthly(new Date(dbMin), new Date(dbMax));
+        else if (state.view === 'custom') renderAllTime(new Date(dbMin), new Date(dbMax), 'custom');
+        else if (state.view === 'all-time') renderAllTime(new Date(dbMin), new Date(dbMax), 'all-time');
+
+      } catch (error) {
+        console.error("Error updating view:", error);
+        alert("Failed to fetch data. Please check console for errors.");
+      } finally {
+        hideLoading();
+      }
+    }
+
+    // RENDERING: DAILY
+    function renderDaily(dStart, dEnd) {
+      document.getElementById('daily-last-updated').textContent = `Loaded at ${new Date().toLocaleTimeString()}`;
+      
+      const feedContainer = document.getElementById('daily-feed');
+      feedContainer.innerHTML = ''; // clear
+
+      // To iterate newest to oldest
+      const dayBlocks = [];
+
+      for (var d = new Date(dEnd); d >= dStart; d.setDate(d.getDate() - 1)) {
+        const dateStr = toDateStr(d);
+        const dayOrders = state.orders.filter(o => o.created_at && o.created_at.startsWith(dateStr));
+        const tagsCounts = categorizeOrders(dayOrders);
+        const revenue = getTotalRevenue(dayOrders);
+        const deliveredCount = tagsCounts['Delivered'] || 0;
+        const adCost = state.adCosts[dateStr] || 0;
+        const pl = calcPL(revenue, deliveredCount, adCost);
+
+        const prettyDate = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+        const profitClass = pl.profit >= 0 ? 'text-profit' : 'text-loss';
+        const profitChar = pl.profit >= 0 ? '▲' : '▼';
+
+        // Order Rows
+        const maxRows = 50;
+        const orderRows = dayOrders.slice(0, maxRows).map(o => {
+          const tStr = o.tags || '';
+          const tRender = tStr.split(',').filter(t=>t.trim()).map(t => `<span class="order-tag">${t.trim()}</span>`).join('');
+          const fn = (o.customer && o.customer.first_name) || '';
+          const ln = (o.customer && o.customer.last_name) || '';
+          const time = o.created_at ? new Date(o.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+          return `
+            <tr>
+              <td>${o.name}</td>
+              <td>${fn} ${ln}</td>
+              <td>${fmt(o.total_price)}</td>
+              <td><div class="order-tags">${tRender}</div></td>
+              <td>${time}</td>
+            </tr>
+          `;
+        }).join('');
+
+        let countText = dayOrders.length.toString();
+        if(dayOrders.length > maxRows) countText = `Showing ${maxRows} of ${dayOrders.length}`;
+
+        // Create DOM element for the day block
+        const dayEl = document.createElement('div');
+        dayEl.className = 'day-block glass';
+        dayEl.innerHTML = `
+          <div class="day-header">
+            <h2>${prettyDate}</h2>
+            <div class="day-actions">
+              <span class="badge live" style="font-size: 14px;">Net: ${profitChar}${fmt(Math.abs(pl.profit))}</span>
+            </div>
+          </div>
+
+          <div class="metrics-grid" style="margin-bottom: 24px;">
+            <div class="metric-card"><div class="metric-label">Orders</div><div class="metric-value">${dayOrders.length}</div></div>
+            <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${deliveredCount}</div></div>
+            <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
+            <div class="metric-card">
+              <div class="metric-label">Ad Spend</div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+                <input type="number" id="ad-${dateStr}" class="inline-input" value="${adCost}" style="width:70px; padding:6px; font-size:16px;"/>
+                <button class="inline-btn primary" id="btn-ad-${dateStr}">Save</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;" onclick="document.getElementById('orders-${dateStr}').style.display = document.getElementById('orders-${dateStr}').style.display === 'none' ? 'block' : 'none'">
+            <h3 style="margin:0; font-size: 16px;">View Orders (${countText})</h3>
+            <span style="color:var(--text-muted)">▼</span>
+          </div>
+
+          <div id="orders-${dateStr}" style="display: none; margin-top: 16px;">
+            <div class="orders-table-wrapper" style="margin: 0; padding: 0;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Order #</th>
+                    <th>Customer</th>
+                    <th>Amount</th>
+                    <th>Tags</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${orderRows || '<tr><td colspan="5" style="text-align:center; color:var(--text-muted)">No orders this day</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+
+        dayBlocks.push(dayEl);
+      }
+
+      for (let el of dayBlocks) {
+        feedContainer.appendChild(el);
+      }
+
+      // Attach event listeners for Ad Cost
+      dayBlocks.forEach(el => {
+        const btn = el.querySelector('button[id^="btn-ad-"]');
+        if (btn) {
+          btn.addEventListener('click', (e) => {
+            const dateStr = e.target.id.replace('btn-ad-', '');
+            const val = document.getElementById(`ad-${dateStr}`).value;
+            saveAdCost(dateStr, val).then(() => {
+               // Soft re-render to update UI immediately
+               const dStartStr = document.getElementById('daily-start-date').value;
+               const dEndStr = document.getElementById('daily-end-date').value;
+               renderDaily(new Date(dStartStr), new Date(dEndStr));
+            });
+          });
+        }
+      });
+      
+      if(dayBlocks.length === 0) {
+        feedContainer.innerHTML = '<div class="empty-state">No days selected or invalid date range.</div>';
+      }
+    }
+
+    // RENDERING: WEEKLY
+    function renderWeekly(wStart, wEnd) {
+      document.getElementById('weekly-range').textContent = `${toDateStr(wStart)} to ${toDateStr(wEnd)}`;
+      
+      let totalOrders = 0;
+      let totalRevenue = 0;
+      let totalDelivered = 0;
+      let totalAdCost = 0;
+      
+      let daysData = [];
+
+      for (var d = new Date(wStart); d <= wEnd; d.setDate(d.getDate() + 1)) {
+        const dStr = toDateStr(d);
+        const dOrders = state.orders.filter(o => o.created_at && o.created_at.startsWith(dStr));
+        const tCounts = categorizeOrders(dOrders);
+        const dRev = getTotalRevenue(dOrders);
+        const dDel = tCounts['Delivered'] || 0;
+        const dCanc = tCounts['Canceled'] || 0;
+        const dAd = state.adCosts[dStr] || 0;
+        const dPL = calcPL(dRev, dDel, dAd);
+
+        totalOrders += dOrders.length;
+        totalRevenue += dRev;
+        totalDelivered += dDel;
+        totalAdCost += dAd;
+
+        daysData.push({
+          label: d.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'}),
+          dayLabel: d.toLocaleDateString('en-US', {weekday:'short'}),
+          orders: dOrders.length,
+          delivered: dDel,
+          canceled: dCanc,
+          profit: dPL.profit
+        });
+      }
+
+      const wPL = calcPL(totalRevenue, totalDelivered, totalAdCost);
+
+      document.getElementById('weekly-metrics').innerHTML = `
+        <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
+        <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
+        <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
+        <div class="metric-card"><div class="metric-label">Net P&L</div><div class="metric-value ${wPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(wPL.profit)}</div></div>
+      `;
+
+      document.getElementById('weekly-breakdown-tbody').innerHTML = daysData.map(dd => `
+        <tr>
+          <td>${dd.label}</td>
+          <td>${dd.orders}</td>
+          <td>${dd.delivered}</td>
+          <td>${dd.canceled}</td>
+          <td class="${dd.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmt(dd.profit)}</td>
+        </tr>
+      `).join('');
+
+      renderPLTable('weekly', wPL, totalDelivered);
+
+      if (state.charts.weekly) state.charts.weekly.destroy();
+      const ctx = document.getElementById('weeklyChart').getContext('2d');
+      state.charts.weekly = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: daysData.map(d => d.dayLabel),
+          datasets: [
+            { label: 'Total Orders', data: daysData.map(d => d.orders), backgroundColor: '#1e88e5' },
+            { label: 'Delivered', data: daysData.map(d => d.delivered), backgroundColor: '#4caf50' }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            y: { ticks: { color: '#a0a0a0' }, grid: { color: '#333' } },
+            x: { ticks: { color: '#a0a0a0' }, grid: { display: false } }
+          },
+          plugins: { legend: { labels: { color: '#a0a0a0' } } }
+        }
+      });
+    }
+
+    // RENDERING: MONTHLY
+    function renderMonthly(mStart, mEnd) {
+      let totalOrders = 0;
+      let totalRevenue = 0;
+      let totalDelivered = 0;
+      let totalCanceled = 0;
+      let totalTransit = 0;
+      let totalAdCost = 0;
+      
+      let daysData = [];
+
+      for (var d = new Date(mStart); d <= mEnd; d.setDate(d.getDate() + 1)) {
+        const dStr = toDateStr(d);
+        const dOrders = state.orders.filter(o => o.created_at && o.created_at.startsWith(dStr));
+        const tCounts = categorizeOrders(dOrders);
+        const dRev = getTotalRevenue(dOrders);
+        const dDel = tCounts['Delivered'] || 0;
+        const dAd = state.adCosts[dStr] || 0;
+
+        totalOrders += dOrders.length;
+        totalRevenue += dRev;
+        totalDelivered += dDel;
+        totalCanceled += tCounts['Canceled'] || 0;
+        totalTransit += tCounts['In Transit'] || 0;
+        totalAdCost += dAd;
+
+        daysData.push({
+          day: d.getDate(),
+          orders: dOrders.length,
+          delivered: dDel
+        });
+      }
+
+      const mPL = calcPL(totalRevenue, totalDelivered, totalAdCost);
+
+      document.getElementById('monthly-metrics').innerHTML = `
+        <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
+        <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
+        <div class="metric-card"><div class="metric-label">In Transit</div><div class="metric-value" style="color:var(--info-color)">${totalTransit}</div></div>
+        <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${totalCanceled}</div></div>
+        <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
+        <div class="metric-card"><div class="metric-label">Ad Spend</div><div class="metric-value">${fmtK(totalAdCost)}</div></div>
+        <div class="metric-card"><div class="metric-label">Net P&L</div><div class="metric-value ${mPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(mPL.profit)}</div></div>
+      `;
+
+      renderPLTable('monthly', mPL, totalDelivered);
+
+      if (state.charts.monthly) state.charts.monthly.destroy();
+      const ctx = document.getElementById('monthlyChart').getContext('2d');
+      state.charts.monthly = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: daysData.map(d => d.day),
+          datasets: [
+            { label: 'Total Orders', data: daysData.map(d => d.orders), backgroundColor: '#1e88e5' },
+            { label: 'Delivered', data: daysData.map(d => d.delivered), backgroundColor: '#4caf50' }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            y: { ticks: { color: '#a0a0a0' }, grid: { color: '#333' } },
+            x: { 
+              ticks: { color: '#a0a0a0', autoSkip: false, maxRotation: 0, font: { size: 10 } },
+              grid: { display: false }
+            }
+          },
+          plugins: { legend: { labels: { color: '#a0a0a0' } } }
+        }
+      });
+    }
+
+    // RENDERING: ALL TIME & CUSTOM (They share the exact same logic & layout)
+    function renderAllTime(tMin, tMax, prefix) {
+      if (state.orders.length === 0) {
+        if(prefix === 'all-time') document.getElementById('all-time-range').textContent = 'No data available yet.';
+        return;
+      }
+      
+      // Find the actual lowest date in the orders
+      const orderDates = state.orders.map(o => new Date(o.created_at)).sort((a,b) => a - b);
+      const firstRealDate = orderDates[0];
+      const lastRealDate = orderDates[orderDates.length - 1];
+      
+      if(prefix === 'all-time') {
+        document.getElementById('all-time-range').textContent = `From ${firstRealDate.toLocaleDateString()} to ${lastRealDate.toLocaleDateString()}`;
+      }
+
+      let totalOrders = state.orders.length;
+      let totalRevenue = getTotalRevenue(state.orders);
+      let tCounts = categorizeOrders(state.orders);
+      let totalDelivered = tCounts['Delivered'] || 0;
+      let totalCanceled = tCounts['Canceled'] || 0;
+      let totalTransit = tCounts['In Transit'] || 0;
+      
+      let totalAdCost = Object.values(state.adCosts).reduce((sum, cost) => sum + cost, 0);
+      const atPL = calcPL(totalRevenue, totalDelivered, totalAdCost);
+
+      const titleOverride = prefix === 'custom' ? 'Selected range' : 'Lifetime';
+
+      document.getElementById(`${prefix}-metrics`).innerHTML = `
+        <div class="metric-card"><div class="metric-label">${titleOverride} Orders</div><div class="metric-value">${totalOrders}</div></div>
+        <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
+        <div class="metric-card"><div class="metric-label">In Transit</div><div class="metric-value" style="color:var(--info-color)">${totalTransit}</div></div>
+        <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${totalCanceled}</div></div>
+        <div class="metric-card"><div class="metric-label">${titleOverride} Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
+        <div class="metric-card"><div class="metric-label">${titleOverride} Ad Spend</div><div class="metric-value">${fmtK(totalAdCost)}</div></div>
+        <div class="metric-card"><div class="metric-label">${titleOverride} Net P&L</div><div class="metric-value ${atPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(atPL.profit)}</div></div>
+      `;
+
+      // Group by YY-MM for breakdown
+      const monthGroups = {};
+      state.orders.forEach(o => {
+        const d = new Date(o.created_at);
+        const yymm = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        if(!monthGroups[yymm]) monthGroups[yymm] = [];
+        monthGroups[yymm].push(o);
+      });
+
+      // Aggregate ad costs per month
+      const adCostsByMonth = {};
+      Object.entries(state.adCosts).forEach(([dStr, cost]) => {
+        const yymm = dStr.substring(0, 7); // YYYY-MM
+        if(!adCostsByMonth[yymm]) adCostsByMonth[yymm] = 0;
+        adCostsByMonth[yymm] += cost;
+      });
+
+      const sortedMonths = Object.keys(monthGroups).sort((a,b) => b.localeCompare(a));
+      
+      document.getElementById(`${prefix}-breakdown-tbody`).innerHTML = sortedMonths.map(yymm => {
+        const mOrders = monthGroups[yymm];
+        const mCounts = categorizeOrders(mOrders);
+        const mRev = getTotalRevenue(mOrders);
+        const mDel = mCounts['Delivered'] || 0;
+        const mCanc = mCounts['Canceled'] || 0;
+        const mAd = adCostsByMonth[yymm] || 0;
+        const mPL = calcPL(mRev, mDel, mAd);
+        
+        const dateObj = new Date(yymm + '-02'); // pad to avoid timezone shifts
+        const mLabel = dateObj.toLocaleDateString('en-US', {month: 'short', year: 'numeric'});
+
+        return `
+          <tr>
+            <td>${mLabel}</td>
+            <td>${mOrders.length}</td>
+            <td>${mDel}</td>
+            <td>${mCanc}</td>
+            <td class="${mPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmt(mPL.profit)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      renderPLTable(prefix, atPL, totalDelivered);
+    }
+
+    function renderPLTable(prefix, pl, deliveredCount) {
+      const bColor = pl.profit >= 0 ? 'var(--profit-color)' : 'var(--loss-color)';
+      const pText = pl.profit >= 0 ? 'Profit' : 'Loss';
+      const bStyle = `background: ${bColor}20; color: ${bColor}; border: 1px solid ${bColor}40`;
+      
+      const badge = document.getElementById(`${prefix}-pl-badge`);
+      if(badge) {
+        badge.textContent = `${pText}: ${fmt(pl.profit)}`;
+        badge.style = bStyle;
+      }
+
+      document.getElementById(`${prefix}-pl-table`).innerHTML = `
+        <tr><td>Revenue (delivered orders)</td><td>${fmt(pl.revenue)}</td></tr>
+        <tr><td>− Product cost (${deliveredCount} units × ₹${PRODUCT_COST})</td><td>${fmt(pl.productCost)}</td></tr>
+        <tr><td>− Shipping cost (${deliveredCount} units × ₹${SHIPPING_COST})</td><td>${fmt(pl.shippingCost)}</td></tr>
+        <tr><td>− Advertising spend (Sum)</td><td>${fmt(pl.adCost)}</td></tr>
+        <tr><td>Total costs</td><td>${fmt(pl.totalCost)}</td></tr>
+        <tr class="total-row">
+          <td>Net ${pText}</td>
+          <td class="${pl.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmt(Math.abs(pl.profit))} ${pl.profit >= 0 ? '▲' : '▼'}</td>
+        </tr>
+      `;
+    }
+
+    // Init
+    setupViewInputs();
+    updateHeader();
+    fetchCurrentView();
+
+  </script>
+</body>
+</html>
