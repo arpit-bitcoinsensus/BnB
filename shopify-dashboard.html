@@ -480,6 +480,13 @@
       if (!document.getElementById('weekly-date').value) {
         document.getElementById('weekly-date').value = toDateStr(now);
       }
+      // All Time: always default from Feb 25, 2026 (store launch date) to today
+      if (!document.getElementById('all-time-from').value) {
+        document.getElementById('all-time-from').value = '2026-02-25';
+      }
+      if (!document.getElementById('all-time-to').value) {
+        document.getElementById('all-time-to').value = toDateStr(now);
+      }
 
       // Populate months and years exactly once
       const mSel = document.getElementById('monthly-month');
@@ -514,10 +521,29 @@
 
       orders.forEach(o => {
         const tags = (o.tags || '').split(',').map(t => t.trim().toLowerCase());
+        const fs = (o.fulfillment_status || '').toLowerCase();
+        const fin = (o.financial_status || '').toLowerCase();
         let matched = false;
+
+        // Check custom tags first (exact STATUS_TAGS match)
         STATUS_TAGS.forEach(st => {
           if (tags.includes(st.toLowerCase())) { counts[st]++; matched = true; }
         });
+
+        // If no tag matched, fall back to Shopify fulfillment/financial status
+        if (!matched) {
+          if (fs === 'fulfilled') {
+            counts['Delivered']++; matched = true;
+          } else if (fs === 'partial') {
+            counts['In Transit']++; matched = true;
+          } else if (fin === 'voided' || fin === 'refunded' ||
+                     tags.some(t => t === 'cancelled' || t === 'canceled')) {
+            counts['Canceled']++; matched = true;
+          } else if (fs === null || fs === '' || fs === 'unfulfilled') {
+            counts['Unfulfilled']++; matched = true;
+          }
+        }
+
         if (!matched) counts['Other']++;
       });
       return counts;
@@ -578,6 +604,8 @@
             created_at: o.created_at,
             total_price: o.total_price,
             tags: o.tags,
+            fulfillment_status: o.fulfillment_status,
+            financial_status: o.financial_status,
             customer_fn: o.customer ? o.customer.first_name : null,
             customer_ln: o.customer ? o.customer.last_name : null
           }));
