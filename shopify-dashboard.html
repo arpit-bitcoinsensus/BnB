@@ -501,10 +501,10 @@
       }
     }
 
-    document.getElementById('btn-fetch-daily').addEventListener('click', fetchCurrentView);
-    document.getElementById('btn-fetch-weekly').addEventListener('click', fetchCurrentView);
-    document.getElementById('btn-fetch-monthly').addEventListener('click', fetchCurrentView);
-    document.getElementById('btn-apply-all-time').addEventListener('click', fetchCurrentView);
+    document.getElementById('btn-fetch-daily').addEventListener('click', () => fetchCurrentView(true));
+    document.getElementById('btn-fetch-weekly').addEventListener('click', () => fetchCurrentView(true));
+    document.getElementById('btn-fetch-monthly').addEventListener('click', () => fetchCurrentView(true));
+    document.getElementById('btn-apply-all-time').addEventListener('click', () => fetchCurrentView(true));
     function showLoading(msg) {
       document.getElementById('loading').classList.add('active');
       document.getElementById('loading-msg').textContent = msg || '';
@@ -1017,7 +1017,8 @@
       const lastRealDate = orderDates[orderDates.length - 1];
       
       if(prefix === 'all-time') {
-        document.getElementById('all-time-range').textContent = `From ${firstRealDate.toLocaleDateString()} to ${lastRealDate.toLocaleDateString()}`;
+        // Show the requested range in the subtitle for clarity
+        document.getElementById('all-time-range').textContent = `From ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`;
       }
 
       let totalOrders = state.orders.length;
