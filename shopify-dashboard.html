@@ -350,50 +350,7 @@
     <div style="font-size:12px; color:var(--text-muted); margin-top:8px;" id="loading-msg"></div>
   </div>
 
-  <!-- Setup Modal -->
-  <div class="modal-overlay" id="setup-modal">
-    <div class="modal">
-      <h2>API Setup</h2>
-      <p>Enter your Shopify and Supabase details. Database credentials are saved locally.</p>
-      
-      <div class="form-group">
-        <label>Shopify Store URL</label>
-        <input type="text" id="input-store" placeholder="e.g. mystore.myshopify.com">
-        <div class="error" id="err-store">Valid store URL required.</div>
-      </div>
-      
-      <div class="form-group">
-        <label>Shopify Client ID (from Dev Dashboard)</label>
-        <input type="text" id="input-client-id" placeholder="e.g. 1cc7e76be3c1b4e3ba25bff8eba0159b">
-        <div class="error" id="err-client-id">Client ID required when using shpss_ secret.</div>
-      </div>
 
-      <div class="form-group">
-        <label>Shopify Client Secret / Access Token</label>
-        <input type="password" id="input-token" placeholder="shpat_... or shpss_...">
-        <div class="error" id="err-token">Token required for live sync.</div>
-      </div>
-
-      <div class="form-group" style="margin-top: 16px;">
-        <label>Supabase URL</label>
-        <input type="text" id="input-supabase-url" placeholder="https://xxxx.supabase.co">
-        <div class="error" id="err-supabase-url">Supabase URL required.</div>
-      </div>
-
-      <div class="form-group">
-        <label>Supabase Anon Key</label>
-        <input type="password" id="input-supabase-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
-        <div class="error" id="err-supabase-key">Supabase key required.</div>
-      </div>
-
-      <p style="font-size: 12px; color: var(--warning-color);">Note: Direct Shopify API calls require a CORS proxy running locally.</p>
-
-      <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
-        <button id="btn-cancel-setup">Cancel</button>
-        <button class="primary" id="btn-save-setup">Save</button>
-      </div>
-    </div>
-  </div>
 
   <!-- Supabase Login Overlay -->
   <div id="login-overlay" style="display: flex; position: fixed; inset: 0; background: var(--bg-color-1); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(10px);">
@@ -416,7 +373,6 @@
         <a href="#" id="auth-toggle-signup" style="color: var(--info-color); text-decoration: none;">Don't have an account? Sign up</a>
         <a href="#" id="auth-toggle-reset" style="color: var(--info-color); text-decoration: none;">Forgot Password?</a>
         <a href="#" id="auth-toggle-login" style="color: var(--info-color); text-decoration: none; display: none;">Back to Login</a>
-        <a href="#" id="auth-toggle-setup" style="color: var(--text-muted); text-decoration: none; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">Missing Configuration? Setup API</a>
       </div>
     </div>
   </div>
@@ -445,47 +401,31 @@
     // CORE STATE
     const state = {
       view: 'daily',
-      clientId: localStorage.getItem('shopify_client_id') || '',
-      storeUrl: localStorage.getItem('shopify_store_url') || '',
-      apiToken: localStorage.getItem('shopify_api_token') || '',
       orders: [],
       adCosts: {},
       user: null
     };
 
-    // Initialize Supabase ONLY if valid credentials exist in localStorage
-    const _sbUrl = (localStorage.getItem('supabase_url') || '').replace('superbase.co', 'supabase.co').trim();
-    const _sbKey = (localStorage.getItem('supabase_key') || '').trim();
-    const supabaseConfigured = !!((_sbUrl.startsWith('https://') && _sbKey.length > 10));
+    // Supabase — hardcoded credentials for this single-store personal dashboard
+    const SUPABASE_URL = 'https://yxjfccuxpwncqzawgnhn.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4amZjY3V4cHduY3F6YXdnbmhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1OTQ3MjUsImV4cCI6MjA4OTE3MDcyNX0.QTl55kYFAz5mFc-muxxZFWlAPdxEmFm9F55F5R5fz3U';
 
-    let sbClient = null;
+    const sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    if (supabaseConfigured) {
-      sbClient = supabase.createClient(_sbUrl, _sbKey);
-
-      // Supabase Auth State Listener (only when configured)
-      sbClient.auth.onAuthStateChange((event, session) => {
-        if (session && session.user) {
-          state.user = session.user;
-          document.getElementById('login-overlay').style.display = 'none';
-          updateHeader();
-          setupViewInputs();
-          fetchCurrentView();
-        } else {
-          state.user = null;
-          document.getElementById('login-overlay').style.display = 'flex';
-          updateHeader();
-        }
-      });
-    } else {
-      // No config yet: show helpful warning immediately (DOM is ready since script is at bottom of page)
-      const errElInit = document.getElementById('login-error');
-      if (errElInit) {
-        errElInit.textContent = 'First-time setup required. Please click "Missing Configuration? Setup API" below.';
-        errElInit.style.color = 'var(--warning-color)';
-        errElInit.style.display = 'block';
+    // Auth State Listener
+    sbClient.auth.onAuthStateChange((event, session) => {
+      if (session && session.user) {
+        state.user = session.user;
+        document.getElementById('login-overlay').style.display = 'none';
+        updateHeader();
+        setupViewInputs();
+        fetchCurrentView();
+      } else {
+        state.user = null;
+        document.getElementById('login-overlay').style.display = 'flex';
+        updateHeader();
       }
-    }
+    });
 
     // Auth Mode Toggles
     let authMode = 'login'; // login, signup, reset
@@ -529,19 +469,6 @@
       document.getElementById('login-error').style.display = 'none';
     });
 
-    document.getElementById('auth-toggle-setup').addEventListener('click', (e) => {
-      e.preventDefault();
-      
-      // Pre-fill the modal with any existing config so they don't overwrite blindly
-      document.getElementById('input-client-id').value = state.clientId || '';
-      document.getElementById('input-store').value = state.storeUrl || '';
-      document.getElementById('input-token').value = state.apiToken || '';
-      // Supabase is read from global variables initialized at load
-      document.getElementById('input-supabase-url').value = localStorage.getItem('supabase_url') || '';
-      document.getElementById('input-supabase-key').value = localStorage.getItem('supabase_key') || '';
-      
-      document.getElementById('setup-modal').classList.add('active');
-    });
 
     // Main Auth Submit Handler
     document.getElementById('btn-login').addEventListener('click', async () => {
@@ -559,11 +486,6 @@
       }
       if (authMode !== 'reset' && !pass) {
         errEl.textContent = 'Please enter a password';
-        errEl.style.display = 'block';
-        return;
-      }
-      if (!localStorage.getItem('supabase_url') || !localStorage.getItem('supabase_key')) {
-        errEl.textContent = 'API not configured! Please click "Missing Configuration" below to link your database.';
         errEl.style.display = 'block';
         return;
       }
@@ -642,84 +564,28 @@
       }
     }
 
-    // Modal Logic
-    // document.getElementById('btn-setup').addEventListener('click', () => { // This is replaced by btn-logout
-    //   document.getElementById('input-client-id').value = state.clientId;
-    //   document.getElementById('input-store').value = state.storeUrl;
-    //   document.getElementById('input-token').value = state.apiToken;
-    //   document.getElementById('input-supabase-url').value = state.supabaseUrl;
-    //   document.getElementById('input-supabase-key').value = state.supabaseKey;
-    //   document.getElementById('setup-modal').classList.add('active');
-    // });
-    
     document.getElementById('btn-logout').addEventListener('click', async () => {
-      if (sbClient) await sbClient.auth.signOut();
+      await sbClient.auth.signOut();
       state.user = null;
       document.getElementById('login-overlay').style.display = 'flex';
       updateHeader();
     });
 
-    document.getElementById('btn-cancel-setup').addEventListener('click', () => {
-      document.getElementById('setup-modal').classList.remove('active');
-    });
-    
-    document.getElementById('btn-save-setup').addEventListener('click', () => {
-      const clientId = document.getElementById('input-client-id').value.trim();
-      const url = document.getElementById('input-store').value.trim();
-      const token = document.getElementById('input-token').value.trim();
-      let sbUrl = document.getElementById('input-supabase-url').value.trim();
-      const sbKey = document.getElementById('input-supabase-key').value.trim();
-      
-      // Auto-correct common "superbase.co" user typo
-      sbUrl = sbUrl.replace('superbase.co', 'supabase.co');
-      
-      let valid = true;
-      if (!url) { document.getElementById('err-store').style.display = 'block'; valid = false; } else { document.getElementById('err-store').style.display = 'none'; }
-      if (!token) { document.getElementById('err-token').style.display = 'block'; valid = false; } else { document.getElementById('err-token').style.display = 'none'; }
-      if (token.startsWith('shpss_') && !clientId) { document.getElementById('err-client-id').style.display = 'block'; valid = false; } else { document.getElementById('err-client-id').style.display = 'none'; }
-      if (!sbUrl) { document.getElementById('err-supabase-url').style.display = 'block'; valid = false; } else { document.getElementById('err-supabase-url').style.display = 'none'; }
-      if (!sbKey) { document.getElementById('err-supabase-key').style.display = 'block'; valid = false; } else { document.getElementById('err-supabase-key').style.display = 'none'; }
-      
-      if (!valid) return;
-
-      state.storeUrl = url;
-      state.clientId = clientId;
-      state.apiToken = token;
-      state.supabaseUrl = sbUrl;
-      state.supabaseKey = sbKey;
-      
-      localStorage.setItem('shopify_store_url', url);
-      localStorage.setItem('shopify_client_id', clientId);
-      localStorage.setItem('shopify_api_token', token);
-      localStorage.setItem('supabase_url', sbUrl);
-      localStorage.setItem('supabase_key', sbKey);
-      
-      // sbClient = window.supabase.createClient(sbUrl, sbKey); // This is now initialized globally
-      
-      document.getElementById('setup-modal').classList.remove('active');
-      
-      // Force page reload so the Supabase Auth SDK successfully reconstructs with your new keys
-      window.location.reload();
-    });
 
     function updateHeader() {
       const connBadge = document.getElementById('conn-badge');
       const syncBtn = document.getElementById('btn-sync-now');
-      const setupBtn = document.getElementById('btn-setup'); // Assuming this is the element that needs to change
       const logoutBtn = document.getElementById('btn-logout');
-      const authSetupLink = document.getElementById('auth-toggle-setup'); // New: Setup link on login overlay
 
       if (state.user) {
         connBadge.style.display = 'inline-block';
         connBadge.textContent = state.user.email;
         syncBtn.style.display = 'inline-block';
-        setupBtn.style.display = 'none'; // Hide setup button
-        logoutBtn.style.display = 'inline-block'; // Show logout button
+        logoutBtn.style.display = 'inline-block';
       } else {
         connBadge.style.display = 'none';
         syncBtn.style.display = 'none';
-        setupBtn.style.display = 'inline-block'; // Show setup button
-        logoutBtn.style.display = 'none'; // Hide logout button
+        logoutBtn.style.display = 'none';
       }
     }
 
@@ -839,12 +705,7 @@
       try {
         const response = await fetch(proxyUrl, {
           method: 'GET',
-          headers: {
-            'X-Shopify-Access-Token': state.apiToken,
-            'X-Shopify-Client-Id': state.clientId,
-            'X-Shopify-Store-Url': state.storeUrl,
-            'Content-Type': 'application/json'
-          }
+          headers: { 'Content-Type': 'application/json' }
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();

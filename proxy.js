@@ -7,13 +7,18 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
-// In-memory token cache: { storeUrl: { accessToken, expiresAt } }
+// Shopify credentials — must be set as environment variables in Vercel
+// (See Vercel Dashboard → Project → Settings → Environment Variables)
+const SHOPIFY_STORE_URL = process.env.SHOPIFY_STORE_URL;
+const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET;
+const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID || '';
+
+// In-memory token cache
 const tokenCache = {};
 
 async function getAccessToken(storeUrl, clientId, clientSecret) {
   const now = Date.now();
   const cached = tokenCache[storeUrl];
-  // Use cached token if still valid (with 60s buffer)
   if (cached && cached.expiresAt > now + 60000) {
     return cached.accessToken;
   }
@@ -35,7 +40,7 @@ async function getAccessToken(storeUrl, clientId, clientSecret) {
   }
 
   const data = await resp.json();
-  const expiresIn = data.expires_in || 86399; // default 24h
+  const expiresIn = data.expires_in || 86399;
   tokenCache[storeUrl] = {
     accessToken: data.access_token,
     expiresAt: now + expiresIn * 1000
@@ -45,31 +50,23 @@ async function getAccessToken(storeUrl, clientId, clientSecret) {
   return data.access_token;
 }
 
-// Main proxy endpoint
+// Main proxy endpoint — credentials come from server env, not request headers
 app.get('/shopify-api/*path', async (req, res) => {
-  const storeUrl = req.headers['x-shopify-store-url'];
-  const clientId = req.headers['x-shopify-client-id'];
-  const clientSecret = req.headers['x-shopify-access-token']; // dashboard sends the secret here
-
-  if (!storeUrl || !clientSecret) {
-    return res.status(400).json({ error: 'Missing x-shopify-store-url or x-shopify-access-token headers' });
-  }
-
   try {
-    // If the token starts with shpat_, it's already a real access token - use directly
-    // If it starts with shpss_, it's a client secret - exchange for token first
-    let accessToken = clientSecret;
-    if (clientSecret.startsWith('shpss_') || clientSecret.startsWith('shpat_') === false) {
-      if (!clientId) {
-        return res.status(400).json({ error: 'Missing x-shopify-client-id header for secret exchange' });
+    let accessToken = SHOPIFY_CLIENT_SECRET;
+
+    // If it's a client secret (shpss_), exchange for access token using client_credentials
+    if (SHOPIFY_CLIENT_SECRET.startsWith('shpss_')) {
+      if (!SHOPIFY_CLIENT_ID) {
+        return res.status(500).json({ error: 'SHOPIFY_CLIENT_ID env var is required for shpss_ secret exchange' });
       }
-      accessToken = await getAccessToken(storeUrl, clientId, clientSecret);
+      accessToken = await getAccessToken(SHOPIFY_STORE_URL, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET);
     }
 
     // Build the target Shopify API URL
     const shopifyPath = req.path.replace('/shopify-api', '');
     const queryString = req.url.includes('?') ? req.url.split('?')[1] : '';
-    const targetUrl = `https://${storeUrl}${shopifyPath}${queryString ? '?' + queryString : ''}`;
+    const targetUrl = `https://${SHOPIFY_STORE_URL}${shopifyPath}${queryString ? '?' + queryString : ''}`;
 
     console.log(`[proxy] → ${targetUrl}`);
 
@@ -96,12 +93,9 @@ app.get('/shopify-api/*path', async (req, res) => {
 });
 
 if (process.env.VERCEL) {
-  // Export the app for Vercel Serverless Functions
   module.exports = app;
 } else {
-  // Run locally on port 3000
   app.listen(PORT, () => {
     console.log(`Shopify Proxy running on http://localhost:${PORT}`);
-    console.log(`Handles automatic OAuth token exchange for shpss_ secrets`);
   });
 }
