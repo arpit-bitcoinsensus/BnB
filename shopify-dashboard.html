@@ -412,9 +412,26 @@
 
     const sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // Whitelist: only these emails can access the dashboard
+    const ALLOWED_EMAILS = [
+      'arpitkumar9619@gmail.com'
+      // Add more emails here if needed:
+      // 'another@email.com'
+    ];
+
     // Auth State Listener
-    sbClient.auth.onAuthStateChange((event, session) => {
+    sbClient.auth.onAuthStateChange(async (event, session) => {
       if (session && session.user) {
+        const email = session.user.email.toLowerCase();
+        if (!ALLOWED_EMAILS.map(e => e.toLowerCase()).includes(email)) {
+          // Not on whitelist — sign them out immediately
+          await sbClient.auth.signOut();
+          const errEl = document.getElementById('login-error');
+          errEl.textContent = 'Access denied. This is a private dashboard.';
+          errEl.style.color = 'var(--loss-color)';
+          errEl.style.display = 'block';
+          return;
+        }
         state.user = session.user;
         document.getElementById('login-overlay').style.display = 'none';
         updateHeader();
