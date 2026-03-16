@@ -95,7 +95,13 @@ app.get('/shopify-api/*path', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Shopify Proxy running on http://localhost:${PORT}`);
-  console.log(`Handles automatic OAuth token exchange for shpss_ secrets`);
-});
+if (process.env.VERCEL) {
+  // Export the app for Vercel Serverless Functions
+  module.exports = app;
+} else {
+  // Run locally on port 3000
+  app.listen(PORT, () => {
+    console.log(`Shopify Proxy running on http://localhost:${PORT}`);
+    console.log(`Handles automatic OAuth token exchange for shpss_ secrets`);
+  });
+}

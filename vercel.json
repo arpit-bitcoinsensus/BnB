@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/shopify-api/(.*)",
+      "destination": "/proxy.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/shopify-dashboard.html"
+    }
+  ]
+}

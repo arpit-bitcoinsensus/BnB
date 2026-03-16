@@ -690,8 +690,8 @@
         fetchFrom = dt.toISOString();
       }
 
-      // 2. Fetch missing orders from Shopify via Local Node Proxy
-      const proxyUrl = `http://localhost:3000/shopify-api/admin/api/2024-01/orders.json?status=any&created_at_min=${fetchFrom}&created_at_max=${maxDate}&limit=250`;
+      // 2. Fetch missing orders from Shopify via Local Node Proxy / Vercel Serverless
+      const proxyUrl = `/shopify-api/admin/api/2024-01/orders.json?status=any&created_at_min=${fetchFrom}&created_at_max=${maxDate}&limit=250`;
       
       try {
         const response = await fetch(proxyUrl, {
