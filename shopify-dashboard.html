@@ -395,6 +395,25 @@
     </div>
   </div>
 
+  <!-- Supabase Login Overlay -->
+  <div id="login-overlay" style="display: flex; position: fixed; inset: 0; background: var(--bg-color-1); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(10px);">
+    <div class="modal" style="display: block; position: relative; width: 340px; text-align: center; border-radius: 12px; box-shadow: var(--glass-shadow); padding: 40px 30px;">
+      <h2 style="margin: 0 0 10px 0;">Welcome Back</h2>
+      <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 24px;">Sign in to access your dashboard</p>
+      
+      <div style="text-align: left; margin-bottom: 15px;">
+        <label style="display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px;">Email</label>
+        <input type="email" id="login-email" placeholder="admin@bnb.com" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-hover); color: white;">
+      </div>
+      <div style="text-align: left; margin-bottom: 24px;">
+        <label style="display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px;">Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-hover); color: white;">
+      </div>
+      <button id="btn-login" class="primary" style="width: 100%; padding: 12px; font-size: 15px;">Sign In</button>
+      <p id="login-error" style="color: var(--loss-color); font-size: 13px; margin-top: 15px; display: none;"></p>
+    </div>
+  </div>
+
   <!-- UMD Build of Chart.js & Supabase JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
