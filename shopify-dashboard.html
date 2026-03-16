@@ -450,7 +450,7 @@
 
 
     document.getElementById('btn-sync-now').addEventListener('click', () => {
-      fetchCurrentView();
+      fetchCurrentView(true); // Force sync on manual click
     });
 
     // Tab Logic
@@ -551,7 +551,11 @@
 
     function getTotalRevenue(orders) {
       return orders
-        .filter(o => (o.tags || '').toLowerCase().split(',').map(t => t.trim()).includes('delivered'))
+        .filter(o => {
+          const tags = (o.tags || '').toLowerCase().split(',').map(t => t.trim());
+          const fs = (o.fulfillment_status || '').toLowerCase();
+          return tags.includes('delivered') || fs === 'fulfilled';
+        })
         .reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
     }
 
@@ -564,25 +568,27 @@
     }
 
     // Fetch API
-    async function syncShopifyToSupabase(minDate, maxDate) {
+    async function syncShopifyToSupabase(minDate, maxDate, isForce = false) {
       if(!sbClient) return;
 
-      // 1. Find the latest order we have for this date range in Supabase
-      const { data: latestOrder, error: sbErr } = await sbClient
-        .from('orders')
-        .select('created_at')
-        .gte('created_at', minDate)
-        .lte('created_at', maxDate)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
       let fetchFrom = minDate;
-      if (!sbErr && latestOrder && latestOrder.length > 0) {
-        // We have some data. Only fetch newer orders from Shopify.
-        // Add 1 second to avoid duplicating the exact same order.
-        let dt = new Date(latestOrder[0].created_at);
-        dt.setSeconds(dt.getSeconds() + 1); 
-        fetchFrom = dt.toISOString();
+
+      if (!isForce) {
+        // 1. Find the latest order we have for this date range in Supabase
+        const { data: latestOrder, error: sbErr } = await sbClient
+          .from('orders')
+          .select('created_at')
+          .gte('created_at', minDate)
+          .lte('created_at', maxDate)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (!sbErr && latestOrder && latestOrder.length > 0) {
+          // We have some data. Only fetch newer orders from Shopify.
+          let dt = new Date(latestOrder[0].created_at);
+          dt.setSeconds(dt.getSeconds() + 1); 
+          fetchFrom = dt.toISOString();
+        }
       }
 
       // 2. Fetch missing orders from Shopify via Local Node Proxy / Vercel Serverless
@@ -636,12 +642,14 @@
         created_at: o.created_at,
         total_price: o.total_price,
         tags: o.tags,
+        fulfillment_status: o.fulfillment_status,
+        financial_status: o.financial_status,
         customer: { first_name: o.customer_fn, last_name: o.customer_ln }
       }));
     }
 
     // Fetch Orchestrator
-    async function fetchCurrentView() {
+    async function fetchCurrentView(isForce = false) {
 
       showLoading('Syncing and loading orders...');
 
@@ -696,7 +704,7 @@
 
         // 1. Sync missing data from Shopify into Supabase
         try {
-          await syncShopifyToSupabase(minDate, maxDate);
+          await syncShopifyToSupabase(minDate, maxDate, isForce);
         } catch(e) {
           // If Shopify fails (CORS etc), we will still try to load whatever is currently in Supabase.
           console.warn("Shopify sync failed. Falling back to cached database data if available.");
