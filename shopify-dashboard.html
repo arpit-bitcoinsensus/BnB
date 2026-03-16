@@ -1018,7 +1018,7 @@
       
       if(prefix === 'all-time') {
         // Show the requested range in the subtitle for clarity
-        document.getElementById('all-time-range').textContent = `From ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`;
+        document.getElementById('all-time-range').textContent = `From ${tMin.toLocaleDateString()} to ${tMax.toLocaleDateString()}`;
       }
 
       let totalOrders = state.orders.length;
@@ -1113,9 +1113,7 @@
     }
 
     // Init
-    setupViewInputs();
-    updateHeader();
-    fetchCurrentView();
+    initDashboard();
 
   </script>
 </body>
