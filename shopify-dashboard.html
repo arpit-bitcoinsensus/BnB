@@ -381,18 +381,26 @@
       adCosts: {}
     };
 
-    // Supabase — hardcoded credentials for this single-store personal dashboard
-    const SUPABASE_URL = 'https://yxjfccuxpwncqzawgnhn.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4amZjY3V4cHduY3F6YXdnbmhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1OTQ3MjUsImV4cCI6MjA4OTE3MDcyNX0.QTl55kYFAz5mFc-muxxZFWlAPdxEmFm9F55F5R5fz3U';
+    // Supabase client — initialized from Vercel environment variables via /api/config
+    let sbClient = null;
 
-    // Supabase client — used for reading/writing orders and ad_spend data
-    const sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    // Dashboard is public — load data immediately on page open
-    window.addEventListener('DOMContentLoaded', () => {
+    // Dashboard init: fetch config from server then start the dashboard
+    async function initDashboard() {
+      try {
+        const res = await fetch('/api/config');
+        if (!res.ok) throw new Error('Config fetch failed: ' + res.status);
+        const { supabaseUrl, supabaseAnonKey } = await res.json();
+        sbClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
+      } catch (e) {
+        console.error('Failed to load config from /api/config:', e);
+        // Fallback: try to continue without Supabase (local data only)
+      }
       setupViewInputs();
       fetchCurrentView();
-    });
+    }
+
+    // Dashboard is public — start immediately
+    initDashboard();
 
 
 
