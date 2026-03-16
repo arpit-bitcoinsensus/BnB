@@ -2,15 +2,11 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/api/config",
-      "destination": "/api/config.js"
-    },
-    {
       "source": "/shopify-api/(.*)",
       "destination": "/proxy.js"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/shopify-dashboard.html"
     }
   ]
