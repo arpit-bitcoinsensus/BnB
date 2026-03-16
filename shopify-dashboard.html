@@ -179,7 +179,8 @@
           </svg>
           Sync Data
         </button>
-        <button id="btn-setup">Setup API</button>
+        <button id="btn-setup" style="display:none;">Setup API</button>
+        <button id="btn-logout" style="display:none; background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;">Logout</button>
       </div>
     </header>
 
@@ -187,7 +188,6 @@
       <div class="tab active" data-target="daily">Daily</div>
       <div class="tab" data-target="weekly">Weekly</div>
       <div class="tab" data-target="monthly">Monthly</div>
-      <div class="tab" data-target="custom">Custom</div>
       <div class="tab" data-target="all-time">All Time</div>
     </div>
 
@@ -298,8 +298,19 @@
     <div id="view-all-time" class="view-content">
       <div class="controls-bar glass">
         <div style="flex: 1;">
-          <h2 style="margin: 0; font-size: 20px;">Lifetime Analytics</h2>
+          <h2 style="margin: 0; font-size: 20px;">Lifetime / Custom Analytics</h2>
           <p style="margin: 4px 0 0 0; color: var(--text-muted); font-size: 14px;" id="all-time-range">Loading...</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+          <div>
+            <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">From</label>
+            <input type="date" id="all-time-from" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-hover); color: var(--text-color);">
+          </div>
+          <div>
+            <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">To</label>
+            <input type="date" id="all-time-to" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-hover); color: var(--text-color);">
+          </div>
+          <button id="btn-apply-all-time" style="align-self: flex-end; padding: 7px 16px;">Apply</button>
         </div>
       </div>
       <div class="metrics-grid" id="all-time-metrics"></div>
@@ -329,52 +340,6 @@
           <!-- Rendered by JS -->
         </table>
       </div>
-
-    <!-- CUSTOM DATE RANGE VIEW -->
-    <div id="view-custom" class="view-content">
-      <div class="controls-bar glass">
-        <div style="flex: 1; display: flex; align-items: center; gap: 15px;">
-          <div>
-            <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">From</label>
-            <input type="date" id="custom-from" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-hover); color: var(--text-color);">
-          </div>
-          <div>
-            <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">To</label>
-            <input type="date" id="custom-to" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-hover); color: var(--text-color);">
-          </div>
-          <button id="btn-apply-custom" style="align-self: flex-end; padding: 7px 16px;">Apply</button>
-        </div>
-      </div>
-      
-      <div class="metrics-grid" id="custom-metrics"></div>
-      
-      <div class="card glass">
-        <h3>Performance Breakdown</h3>
-        <table class="pnll-table" style="margin-top: 10px;">
-          <thead>
-            <tr>
-              <th style="text-align:left; padding-bottom:8px; border-bottom:1px solid var(--border-color);">Month</th>
-              <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color);">Orders</th>
-              <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color);">Delivered</th>
-              <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color);">Canceled</th>
-              <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color); text-align:right;">Net P&L</th>
-            </tr>
-          </thead>
-          <tbody id="custom-breakdown-tbody"></tbody>
-        </table>
-      </div>
-      
-      <div class="card glass">
-        <h3 style="display: flex; justify-content: space-between; align-items: center;">
-          Custom Profit & Loss
-          <span class="badge" id="custom-pl-badge"></span>
-        </h3>
-        <table class="pnll-table" id="custom-pl-table">
-          <!-- Rendered by JS -->
-        </table>
-      </div>
-    </div>
-    </div>
 
   </div>
 
@@ -451,26 +416,64 @@
       'Fulfilled': '#4caf50',
       'Other': '#757575'
     };
-
-    // State
-    let state = {
+    // CORE STATE
+    const state = {
       view: 'daily',
       clientId: localStorage.getItem('shopify_client_id') || '',
       storeUrl: localStorage.getItem('shopify_store_url') || '',
       apiToken: localStorage.getItem('shopify_api_token') || '',
-      supabaseUrl: (localStorage.getItem('supabase_url') || '').replace('superbase.co', 'supabase.co'),
-      supabaseKey: localStorage.getItem('supabase_key') || '',
-      orders: [], // Current view orders
-      adCosts: {}, // Loaded from Supabase for current view
-      charts: { daily: null, weekly: null, monthly: null }
+      orders: [],
+      adCosts: {},
+      user: null
     };
 
-    let sbClient = null;
-    if(state.supabaseUrl && state.supabaseKey) {
-      sbClient = window.supabase.createClient(state.supabaseUrl, state.supabaseKey);
-    }
+    // Initialize Supabase. For full authentication support, you must replace 
+    // YOUR_SUPABASE_URL and YOUR_SUPABASE_ANON_KEY with your project strings.
+    const SUPABASE_URL = "YOUR_SUPABASE_URL" !== "YOUR_SUPABASE_URL" ? "YOUR_SUPABASE_URL" : (localStorage.getItem('supabase_url') || '').replace('superbase.co', 'supabase.co');
+    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY" !== "YOUR_SUPABASE_ANON_KEY" ? "YOUR_SUPABASE_ANON_KEY" : (localStorage.getItem('supabase_key') || '');
 
-    // Date Utilities
+    let sbClient = supabase.createClient(SUPABASE_URL || 'https://dummy.supabase.co', SUPABASE_ANON_KEY || 'dummy_key');
+
+    // Supabase Auth Event Listener
+    sbClient.auth.onAuthStateChange((event, session) => {
+      if (session && session.user) {
+        state.user = session.user;
+        document.getElementById('login-overlay').style.display = 'none';
+        updateHeader();
+        
+        // Auto-fetch data upon successful login
+        setupViewInputs();
+        fetchCurrentView();
+      } else {
+        state.user = null;
+        document.getElementById('login-overlay').style.display = 'flex';
+        updateHeader();
+      }
+    });
+
+    // Login Handler
+    document.getElementById('btn-login').addEventListener('click', async () => {
+      const email = document.getElementById('login-email').value;
+      const pass = document.getElementById('login-password').value;
+      const errEl = document.getElementById('login-error');
+      
+      errEl.style.display = 'none';
+      if (!email || !pass) {
+        errEl.textContent = 'Please enter both email and password';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      showLoading('Authenticating...');
+      const { data, error } = await sbClient.auth.signInWithPassword({ email: email, password: pass });
+      hideLoading();
+
+      if (error) {
+        errEl.textContent = error.message;
+        errEl.style.display = 'block';
+      }
+    });
+
     function toDateStr(d) {
       return d.getFullYear() + '-' +
         String(d.getMonth() + 1).padStart(2, '0') + '-' +
@@ -516,15 +519,22 @@
     }
 
     // Modal Logic
-    document.getElementById('btn-setup').addEventListener('click', () => {
-      document.getElementById('input-client-id').value = state.clientId;
-      document.getElementById('input-store').value = state.storeUrl;
-      document.getElementById('input-token').value = state.apiToken;
-      document.getElementById('input-supabase-url').value = state.supabaseUrl;
-      document.getElementById('input-supabase-key').value = state.supabaseKey;
-      document.getElementById('setup-modal').classList.add('active');
-    });
+    // document.getElementById('btn-setup').addEventListener('click', () => { // This is replaced by btn-logout
+    //   document.getElementById('input-client-id').value = state.clientId;
+    //   document.getElementById('input-store').value = state.storeUrl;
+    //   document.getElementById('input-token').value = state.apiToken;
+    //   document.getElementById('input-supabase-url').value = state.supabaseUrl;
+    //   document.getElementById('input-supabase-key').value = state.supabaseKey;
+    //   document.getElementById('setup-modal').classList.add('active');
+    // });
     
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      await sbClient.auth.signOut();
+      state.user = null;
+      document.getElementById('login-overlay').style.display = 'flex';
+      updateHeader();
+    });
+
     document.getElementById('btn-cancel-setup').addEventListener('click', () => {
       document.getElementById('setup-modal').classList.remove('active');
     });
@@ -560,7 +570,7 @@
       localStorage.setItem('supabase_url', sbUrl);
       localStorage.setItem('supabase_key', sbKey);
       
-      sbClient = window.supabase.createClient(sbUrl, sbKey);
+      // sbClient = window.supabase.createClient(sbUrl, sbKey); // This is now initialized globally
       
       document.getElementById('setup-modal').classList.remove('active');
       updateHeader();
@@ -570,13 +580,20 @@
     function updateHeader() {
       const connBadge = document.getElementById('conn-badge');
       const syncBtn = document.getElementById('btn-sync-now');
-      if (state.storeUrl) {
+      const setupBtn = document.getElementById('btn-setup'); // Assuming this is the element that needs to change
+      const logoutBtn = document.getElementById('btn-logout');
+
+      if (state.user) {
         connBadge.style.display = 'inline-block';
-        connBadge.textContent = state.storeUrl;
+        connBadge.textContent = state.user.email;
         syncBtn.style.display = 'inline-block';
+        setupBtn.style.display = 'none'; // Hide setup button
+        logoutBtn.style.display = 'inline-block'; // Show logout button
       } else {
         connBadge.style.display = 'none';
         syncBtn.style.display = 'none';
+        setupBtn.style.display = 'inline-block'; // Show setup button
+        logoutBtn.style.display = 'none'; // Hide logout button
       }
     }
 
@@ -628,7 +645,7 @@
     document.getElementById('btn-fetch-daily').addEventListener('click', fetchCurrentView);
     document.getElementById('btn-fetch-weekly').addEventListener('click', fetchCurrentView);
     document.getElementById('btn-fetch-monthly').addEventListener('click', fetchCurrentView);
-
+    document.getElementById('btn-apply-all-time').addEventListener('click', fetchCurrentView);
     function showLoading(msg) {
       document.getElementById('loading').classList.add('active');
       document.getElementById('loading-msg').textContent = msg || '';
@@ -791,9 +808,19 @@
           
           minDate = `${dbMin}T00:00:00`; maxDate = `${dbMax}T23:59:59`;
         } else if (state.view === 'all-time') {
-          // Hardcode starting epoch as requested
-          dbMin = '2026-02-25'; 
-          dbMax = '2026-03-17';
+          // Check if user set explicit Custom Range picker values inside the All Time tab
+          const customFrom = document.getElementById('all-time-from').value;
+          const customTo = document.getElementById('all-time-to').value;
+          
+          if (customFrom && customTo) {
+            dbMin = customFrom;
+            dbMax = customTo;
+          } else {
+            // Default All Time fetch bounds
+            dbMin = '2026-02-25'; 
+            dbMax = toDateStr(new Date());
+          }
+          
           minDate = `${dbMin}T00:00:00`; maxDate = `${dbMax}T23:59:59`;
         }
 
