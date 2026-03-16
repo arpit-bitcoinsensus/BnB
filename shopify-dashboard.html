@@ -173,14 +173,13 @@
       <h1>Shopify Analytics</h1>
       <div class="header-controls">
         <span id="conn-badge" class="badge live" style="display:none;"></span>
-        <button id="btn-sync-now" class="primary" style="display:none;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
+        <button id="btn-sync-now" class="primary">
+
             <path d="M21.5 2v6h-6M2.13 15.57a9 9 0 0 0 16.59 2.07L21.5 14M2.5 22v-6h6M22.39 8.35A9 9 0 0 0 6.64 5.92L2.5 10"/>
           </svg>
           Sync Data
         </button>
-        <button id="btn-setup" style="display:none;">Setup API</button>
-        <button id="btn-logout" style="display:none; background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;">Logout</button>
+
       </div>
     </header>
 
@@ -352,30 +351,7 @@
 
 
 
-  <!-- Supabase Login Overlay -->
-  <div id="login-overlay" style="display: flex; position: fixed; inset: 0; background: var(--bg-color-1); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(10px);">
-    <div class="modal" style="display: block; position: relative; width: 340px; text-align: center; border-radius: 12px; box-shadow: var(--glass-shadow); padding: 40px 30px;">
-      <h2 id="auth-title" style="margin: 0 0 10px 0;">Welcome Back</h2>
-      <p id="auth-subtitle" style="color: var(--text-muted); font-size: 14px; margin-bottom: 24px;">Sign in to access your dashboard</p>
-      
-      <div style="text-align: left; margin-bottom: 15px;">
-        <label style="display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px;">Email</label>
-        <input type="email" id="login-email" placeholder="admin@bnb.com" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-hover); color: white;">
-      </div>
-      <div id="auth-password-group" style="text-align: left; margin-bottom: 24px;">
-        <label style="display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px;">Password</label>
-        <input type="password" id="login-password" placeholder="••••••••" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-hover); color: white;">
-      </div>
-      <button id="btn-login" class="primary" style="width: 100%; padding: 12px; font-size: 15px;">Sign In</button>
-      <p id="login-error" style="font-size: 13px; margin-top: 15px; display: none;"></p>
-      
-      <div style="margin-top: 20px; font-size: 13px; color: var(--text-muted); display: flex; flex-direction: column; gap: 8px;">
-        <a href="#" id="auth-toggle-signup" style="color: var(--info-color); text-decoration: none;">Don't have an account? Sign up</a>
-        <a href="#" id="auth-toggle-reset" style="color: var(--info-color); text-decoration: none;">Forgot Password?</a>
-        <a href="#" id="auth-toggle-login" style="color: var(--info-color); text-decoration: none; display: none;">Back to Login</a>
-      </div>
-    </div>
-  </div>
+
 
   <!-- UMD Build of Chart.js & Supabase JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -402,140 +378,23 @@
     const state = {
       view: 'daily',
       orders: [],
-      adCosts: {},
-      user: null
+      adCosts: {}
     };
 
     // Supabase — hardcoded credentials for this single-store personal dashboard
     const SUPABASE_URL = 'https://yxjfccuxpwncqzawgnhn.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4amZjY3V4cHduY3F6YXdnbmhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1OTQ3MjUsImV4cCI6MjA4OTE3MDcyNX0.QTl55kYFAz5mFc-muxxZFWlAPdxEmFm9F55F5R5fz3U';
 
+    // Supabase client — used for reading/writing orders and ad_spend data
     const sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Whitelist: only these emails can access the dashboard
-    const ALLOWED_EMAILS = [
-      'arpitkumar9619@gmail.com'
-      // Add more emails here if needed:
-      // 'another@email.com'
-    ];
-
-    // Auth State Listener
-    sbClient.auth.onAuthStateChange(async (event, session) => {
-      if (session && session.user) {
-        const email = session.user.email.toLowerCase();
-        if (!ALLOWED_EMAILS.map(e => e.toLowerCase()).includes(email)) {
-          // Not on whitelist — sign them out immediately
-          await sbClient.auth.signOut();
-          const errEl = document.getElementById('login-error');
-          errEl.textContent = 'Access denied. This is a private dashboard.';
-          errEl.style.color = 'var(--loss-color)';
-          errEl.style.display = 'block';
-          return;
-        }
-        state.user = session.user;
-        document.getElementById('login-overlay').style.display = 'none';
-        updateHeader();
-        setupViewInputs();
-        fetchCurrentView();
-      } else {
-        state.user = null;
-        document.getElementById('login-overlay').style.display = 'flex';
-        updateHeader();
-      }
-    });
-
-    // Auth Mode Toggles
-    let authMode = 'login'; // login, signup, reset
-
-    document.getElementById('auth-toggle-signup').addEventListener('click', (e) => {
-      e.preventDefault();
-      authMode = 'signup';
-      document.getElementById('auth-title').textContent = 'Create Account';
-      document.getElementById('auth-subtitle').textContent = 'Sign up for a new dashboard account';
-      document.getElementById('auth-password-group').style.display = 'block';
-      document.getElementById('btn-login').textContent = 'Sign Up';
-      document.getElementById('auth-toggle-signup').style.display = 'none';
-      document.getElementById('auth-toggle-reset').style.display = 'none';
-      document.getElementById('auth-toggle-login').style.display = 'inline-block';
-      document.getElementById('login-error').style.display = 'none';
-    });
-
-    document.getElementById('auth-toggle-reset').addEventListener('click', (e) => {
-      e.preventDefault();
-      authMode = 'reset';
-      document.getElementById('auth-title').textContent = 'Reset Password';
-      document.getElementById('auth-subtitle').textContent = 'Enter your email to receive a reset link';
-      document.getElementById('auth-password-group').style.display = 'none';
-      document.getElementById('btn-login').textContent = 'Send Reset Link';
-      document.getElementById('auth-toggle-signup').style.display = 'none';
-      document.getElementById('auth-toggle-reset').style.display = 'none';
-      document.getElementById('auth-toggle-login').style.display = 'inline-block';
-      document.getElementById('login-error').style.display = 'none';
-    });
-
-    document.getElementById('auth-toggle-login').addEventListener('click', (e) => {
-      e.preventDefault();
-      authMode = 'login';
-      document.getElementById('auth-title').textContent = 'Welcome Back';
-      document.getElementById('auth-subtitle').textContent = 'Sign in to access your dashboard';
-      document.getElementById('auth-password-group').style.display = 'block';
-      document.getElementById('btn-login').textContent = 'Sign In';
-      document.getElementById('auth-toggle-signup').style.display = 'inline-block';
-      document.getElementById('auth-toggle-reset').style.display = 'inline-block';
-      document.getElementById('auth-toggle-login').style.display = 'none';
-      document.getElementById('login-error').style.display = 'none';
+    // Dashboard is public — load data immediately on page open
+    window.addEventListener('DOMContentLoaded', () => {
+      setupViewInputs();
+      fetchCurrentView();
     });
 
 
-    // Main Auth Submit Handler
-    document.getElementById('btn-login').addEventListener('click', async () => {
-      const email = document.getElementById('login-email').value;
-      const pass = document.getElementById('login-password').value;
-      const errEl = document.getElementById('login-error');
-      
-      errEl.style.display = 'none';
-      errEl.style.color = 'var(--loss-color)';
-
-      if (!email) {
-        errEl.textContent = 'Please enter an email';
-        errEl.style.display = 'block';
-        return;
-      }
-      if (authMode !== 'reset' && !pass) {
-        errEl.textContent = 'Please enter a password';
-        errEl.style.display = 'block';
-        return;
-      }
-
-      showLoading('Working...');
-      let res;
-      
-      if (authMode === 'login') {
-        res = await sbClient.auth.signInWithPassword({ email, password: pass });
-      } else if (authMode === 'signup') {
-        res = await sbClient.auth.signUp({ email, password: pass });
-      } else if (authMode === 'reset') {
-        res = await sbClient.auth.resetPasswordForEmail(email);
-      }
-      
-      hideLoading();
-
-      if (res.error) {
-        errEl.textContent = res.error.message;
-        errEl.style.color = 'var(--loss-color)';
-        errEl.style.display = 'block';
-      } else {
-        if (authMode === 'signup') {
-          errEl.textContent = 'Success! Please check your email to confirm your account.';
-          errEl.style.color = 'var(--profit-color)';
-          errEl.style.display = 'block';
-        } else if (authMode === 'reset') {
-          errEl.textContent = 'Password reset link sent to your email.';
-          errEl.style.color = 'var(--profit-color)';
-          errEl.style.display = 'block';
-        }
-      }
-    });
 
     function toDateStr(d) {
       return d.getFullYear() + '-' +
@@ -581,30 +440,6 @@
       }
     }
 
-    document.getElementById('btn-logout').addEventListener('click', async () => {
-      await sbClient.auth.signOut();
-      state.user = null;
-      document.getElementById('login-overlay').style.display = 'flex';
-      updateHeader();
-    });
-
-
-    function updateHeader() {
-      const connBadge = document.getElementById('conn-badge');
-      const syncBtn = document.getElementById('btn-sync-now');
-      const logoutBtn = document.getElementById('btn-logout');
-
-      if (state.user) {
-        connBadge.style.display = 'inline-block';
-        connBadge.textContent = state.user.email;
-        syncBtn.style.display = 'inline-block';
-        logoutBtn.style.display = 'inline-block';
-      } else {
-        connBadge.style.display = 'none';
-        syncBtn.style.display = 'none';
-        logoutBtn.style.display = 'none';
-      }
-    }
 
     document.getElementById('btn-sync-now').addEventListener('click', () => {
       fetchCurrentView();
