@@ -398,19 +398,25 @@
   <!-- Supabase Login Overlay -->
   <div id="login-overlay" style="display: flex; position: fixed; inset: 0; background: var(--bg-color-1); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(10px);">
     <div class="modal" style="display: block; position: relative; width: 340px; text-align: center; border-radius: 12px; box-shadow: var(--glass-shadow); padding: 40px 30px;">
-      <h2 style="margin: 0 0 10px 0;">Welcome Back</h2>
-      <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 24px;">Sign in to access your dashboard</p>
+      <h2 id="auth-title" style="margin: 0 0 10px 0;">Welcome Back</h2>
+      <p id="auth-subtitle" style="color: var(--text-muted); font-size: 14px; margin-bottom: 24px;">Sign in to access your dashboard</p>
       
       <div style="text-align: left; margin-bottom: 15px;">
         <label style="display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px;">Email</label>
         <input type="email" id="login-email" placeholder="admin@bnb.com" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-hover); color: white;">
       </div>
-      <div style="text-align: left; margin-bottom: 24px;">
+      <div id="auth-password-group" style="text-align: left; margin-bottom: 24px;">
         <label style="display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px;">Password</label>
         <input type="password" id="login-password" placeholder="••••••••" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-hover); color: white;">
       </div>
       <button id="btn-login" class="primary" style="width: 100%; padding: 12px; font-size: 15px;">Sign In</button>
-      <p id="login-error" style="color: var(--loss-color); font-size: 13px; margin-top: 15px; display: none;"></p>
+      <p id="login-error" style="font-size: 13px; margin-top: 15px; display: none;"></p>
+      
+      <div style="margin-top: 20px; font-size: 13px; color: var(--text-muted); display: flex; flex-direction: column; gap: 8px;">
+        <a href="#" id="auth-toggle-signup" style="color: var(--info-color); text-decoration: none;">Don't have an account? Sign up</a>
+        <a href="#" id="auth-toggle-reset" style="color: var(--info-color); text-decoration: none;">Forgot Password?</a>
+        <a href="#" id="auth-toggle-login" style="color: var(--info-color); text-decoration: none; display: none;">Back to Login</a>
+      </div>
     </div>
   </div>
 
@@ -470,26 +476,95 @@
       }
     });
 
-    // Login Handler
+    // Auth Mode Toggles
+    let authMode = 'login'; // login, signup, reset
+
+    document.getElementById('auth-toggle-signup').addEventListener('click', (e) => {
+      e.preventDefault();
+      authMode = 'signup';
+      document.getElementById('auth-title').textContent = 'Create Account';
+      document.getElementById('auth-subtitle').textContent = 'Sign up for a new dashboard account';
+      document.getElementById('auth-password-group').style.display = 'block';
+      document.getElementById('btn-login').textContent = 'Sign Up';
+      document.getElementById('auth-toggle-signup').style.display = 'none';
+      document.getElementById('auth-toggle-reset').style.display = 'none';
+      document.getElementById('auth-toggle-login').style.display = 'inline-block';
+      document.getElementById('login-error').style.display = 'none';
+    });
+
+    document.getElementById('auth-toggle-reset').addEventListener('click', (e) => {
+      e.preventDefault();
+      authMode = 'reset';
+      document.getElementById('auth-title').textContent = 'Reset Password';
+      document.getElementById('auth-subtitle').textContent = 'Enter your email to receive a reset link';
+      document.getElementById('auth-password-group').style.display = 'none';
+      document.getElementById('btn-login').textContent = 'Send Reset Link';
+      document.getElementById('auth-toggle-signup').style.display = 'none';
+      document.getElementById('auth-toggle-reset').style.display = 'none';
+      document.getElementById('auth-toggle-login').style.display = 'inline-block';
+      document.getElementById('login-error').style.display = 'none';
+    });
+
+    document.getElementById('auth-toggle-login').addEventListener('click', (e) => {
+      e.preventDefault();
+      authMode = 'login';
+      document.getElementById('auth-title').textContent = 'Welcome Back';
+      document.getElementById('auth-subtitle').textContent = 'Sign in to access your dashboard';
+      document.getElementById('auth-password-group').style.display = 'block';
+      document.getElementById('btn-login').textContent = 'Sign In';
+      document.getElementById('auth-toggle-signup').style.display = 'inline-block';
+      document.getElementById('auth-toggle-reset').style.display = 'inline-block';
+      document.getElementById('auth-toggle-login').style.display = 'none';
+      document.getElementById('login-error').style.display = 'none';
+    });
+
+    // Main Auth Submit Handler
     document.getElementById('btn-login').addEventListener('click', async () => {
       const email = document.getElementById('login-email').value;
       const pass = document.getElementById('login-password').value;
       const errEl = document.getElementById('login-error');
       
       errEl.style.display = 'none';
-      if (!email || !pass) {
-        errEl.textContent = 'Please enter both email and password';
+      errEl.style.color = 'var(--loss-color)';
+
+      if (!email) {
+        errEl.textContent = 'Please enter an email';
+        errEl.style.display = 'block';
+        return;
+      }
+      if (authMode !== 'reset' && !pass) {
+        errEl.textContent = 'Please enter a password';
         errEl.style.display = 'block';
         return;
       }
 
-      showLoading('Authenticating...');
-      const { data, error } = await sbClient.auth.signInWithPassword({ email: email, password: pass });
+      showLoading('Working...');
+      let res;
+      
+      if (authMode === 'login') {
+        res = await sbClient.auth.signInWithPassword({ email, password: pass });
+      } else if (authMode === 'signup') {
+        res = await sbClient.auth.signUp({ email, password: pass });
+      } else if (authMode === 'reset') {
+        res = await sbClient.auth.resetPasswordForEmail(email);
+      }
+      
       hideLoading();
 
-      if (error) {
-        errEl.textContent = error.message;
+      if (res.error) {
+        errEl.textContent = res.error.message;
+        errEl.style.color = 'var(--loss-color)';
         errEl.style.display = 'block';
+      } else {
+        if (authMode === 'signup') {
+          errEl.textContent = 'Success! Please check your email to confirm your account.';
+          errEl.style.color = 'var(--profit-color)';
+          errEl.style.display = 'block';
+        } else if (authMode === 'reset') {
+          errEl.textContent = 'Password reset link sent to your email.';
+          errEl.style.color = 'var(--profit-color)';
+          errEl.style.display = 'block';
+        }
       }
     });
 
