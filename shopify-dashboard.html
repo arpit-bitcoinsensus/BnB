@@ -552,6 +552,11 @@
         errEl.style.display = 'block';
         return;
       }
+      if (!localStorage.getItem('supabase_url') || !localStorage.getItem('supabase_key')) {
+        errEl.textContent = 'API not configured! Please click "Missing Configuration" below to link your database.';
+        errEl.style.display = 'block';
+        return;
+      }
 
       showLoading('Working...');
       let res;
