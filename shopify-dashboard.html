@@ -219,6 +219,8 @@
         <div style="display: flex; gap: 12px;">
           <button class="primary" id="btn-fetch-sheet">Fetch Details</button>
           <button id="btn-export-csv" style="font-size: 13px;">Export CSV</button>
+          <button id="btn-import-csv" style="font-size: 13px; background: var(--secondary);">Import CSV</button>
+          <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
         </div>
       </div>
 
@@ -544,6 +546,20 @@
       if(error) console.error("Error saving ad spend:", error);
     }
 
+    async function saveBulkAdCost(start, end, totalCost) {
+      if(!sbClient) return;
+      const days = [];
+      const d = new Date(start);
+      while(d <= end) {
+        days.push(toDateStr(d));
+        d.setDate(d.getDate() + 1);
+      }
+      const dailyCost = (parseFloat(totalCost) || 0) / days.length;
+      const rows = days.map(date => ({ date, cost: dailyCost }));
+      const { error } = await sbClient.from('ad_costs').upsert(rows, { onConflict: 'date' });
+      if(error) console.error("Bulk save ad cost error:", error);
+    }
+
     async function loadAdCosts(minDate, maxDate) {
       if(!sbClient) return;
       const { data, error } = await sbClient
@@ -564,6 +580,8 @@
     });
 
     document.getElementById('btn-export-csv')?.addEventListener('click', () => exportToCSV());
+    document.getElementById('btn-import-csv')?.addEventListener('click', () => document.getElementById('csv-file-input').click());
+    document.getElementById('csv-file-input')?.addEventListener('change', (e) => handleCSVImport(e));
     document.getElementById('btn-fetch-products')?.addEventListener('click', () => fetchCurrentView(true));
 
     // Chart.js Defaults
@@ -1171,6 +1189,84 @@
       return { repeatRate: total > 0 ? (repeat / total * 100).toFixed(1) : 0 };
     }
 
+    async function handleCSVImport(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      showLoading(`Parsing ${file.name}...`);
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const text = e.target.result;
+          const rows = text.split('\n').map(row => row.split(',').map(cell => cell.replace(/^"|"$/g, '').trim()));
+          const headers = rows[0].map(h => h.toLowerCase());
+          
+          const colMap = {
+            id: headers.indexOf('id') !== -1 ? headers.indexOf('id') : headers.indexOf('order'),
+            name: headers.indexOf('name') !== -1 ? headers.indexOf('name') : headers.indexOf('order'),
+            date: headers.indexOf('created at') !== -1 ? headers.indexOf('created at') : headers.indexOf('date'),
+            total: headers.indexOf('total') !== -1 ? headers.indexOf('total') : headers.indexOf('amount'),
+            tags: headers.indexOf('tags'),
+            customer_fn: headers.indexOf('first name'),
+            customer_ln: headers.indexOf('last name')
+          };
+
+          if (colMap.name === -1 || colMap.date === -1 || colMap.total === -1) {
+            throw new Error("CSV missing core columns (Order/Name, Date, Total)");
+          }
+
+          const ordersToUpsert = [];
+          for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (row.length < 3) continue;
+            
+            const rawName = row[colMap.name];
+            // Shopify historical IDs can be missing in CSV, use Name as fallback ID if numeric ID not present
+            const id = colMap.id !== -1 && !isNaN(row[colMap.id]) ? parseInt(row[colMap.id]) : Math.abs(rawName.hashCode());
+            
+            ordersToUpsert.push({
+              id: id,
+              name: rawName,
+              created_at: new Date(row[colMap.date]).toISOString(),
+              total_price: parseFloat(row[colMap.total]) || 0,
+              tags: colMap.tags !== -1 ? row[colMap.tags] : '',
+              fulfillment_status: 'fulfilled', // default for historical
+              financial_status: 'paid', // default for historical
+              customer_fn: colMap.customer_fn !== -1 ? row[colMap.customer_fn] : null,
+              customer_ln: colMap.customer_ln !== -1 ? row[colMap.customer_ln] : null
+            });
+          }
+
+          if (ordersToUpsert.length > 0) {
+            showLoading(`Saving ${ordersToUpsert.length} historical orders...`);
+            const { error } = await sbClient.from('orders').upsert(ordersToUpsert, { onConflict: 'id' });
+            if (error) throw error;
+            alert(`Successfully imported ${ordersToUpsert.length} orders!`);
+            fetchCurrentView(true);
+          }
+        } catch (err) {
+          console.error("CSV Import Failed:", err);
+          alert("CSV Import Failed: " + err.message);
+        } finally {
+          document.getElementById('csv-file-input').value = '';
+          hideLoading();
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // Helper to generate hash code for string IDs
+    String.prototype.hashCode = function() {
+      var hash = 0, i, chr;
+      if (this.length === 0) return hash;
+      for (i = 0; i < this.length; i++) {
+        chr = this.charCodeAt(i);
+        hash = ((hash << 5) - hash) + chr;
+        hash |= 0;
+      }
+      return hash;
+    };
+
     // RENDERING: DAILY
     function renderDaily(dStart, dEnd) {
       document.getElementById('daily-last-updated').textContent = `Loaded at ${new Date().toLocaleTimeString()}`;
@@ -1332,25 +1428,29 @@
       }
 
       const wPL = calcPL(totalRevenue, totalDelivered, totalAdCost);
+      const wRet = getRetentionMetrics();
 
       document.getElementById('weekly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
+        <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${wRet.repeatRate}%</div></div>
         <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
+        <div class="metric-card">
+          <div class="metric-label">Ad Spend</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+            <input type="number" id="ad-weekly-total" class="inline-input" value="${totalAdCost}" style="width:70px; padding:6px;"/>
+            <button class="inline-btn primary" id="btn-ad-weekly-save">Save</button>
+          </div>
+        </div>
         <div class="metric-card"><div class="metric-label">Net P&L</div><div class="metric-value ${wPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(wPL.profit)}</div></div>
       `;
 
-      document.getElementById('weekly-breakdown-tbody').innerHTML = daysData.map(dd => `
-        <tr>
-          <td>${dd.label}</td>
-          <td>${dd.orders}</td>
-          <td>${dd.delivered}</td>
-          <td>${dd.canceled}</td>
-          <td class="${dd.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmt(dd.profit)}</td>
-        </tr>
-      `).join('');
-
       renderPLTable('weekly', wPL, totalDelivered);
+
+      document.getElementById('btn-ad-weekly-save')?.addEventListener('click', () => {
+        const val = document.getElementById('ad-weekly-total').value;
+        saveBulkAdCost(new Date(wStart), new Date(wEnd), val).then(() => fetchCurrentView(true));
+      });
 
       if (state.charts.weekly) state.charts.weekly.destroy();
       const ctx = document.getElementById('weeklyChart').getContext('2d');
@@ -1414,12 +1514,25 @@
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${mRet.repeatRate}%</div></div>
+        <div class="metric-card"><div class="metric-label">In Transit</div><div class="metric-value" style="color:var(--primary)">${totalTransit}</div></div>
+        <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${totalCanceled}</div></div>
         <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
-        <div class="metric-card"><div class="metric-label">Ad Spend</div><div class="metric-value text-loss">${fmtK(totalAdCost)}</div></div>
+        <div class="metric-card">
+          <div class="metric-label">Ad Spend</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+            <input type="number" id="ad-monthly-total" class="inline-input" value="${totalAdCost}" style="width:70px; padding:6px;"/>
+            <button class="inline-btn primary" id="btn-ad-monthly-save">Save</button>
+          </div>
+        </div>
         <div class="metric-card"><div class="metric-label">Net P&L</div><div class="metric-value ${mPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(mPL.profit)}</div></div>
       `;
 
       renderPLTable('monthly', mPL, totalDelivered);
+
+      document.getElementById('btn-ad-monthly-save')?.addEventListener('click', () => {
+        const val = document.getElementById('ad-monthly-total').value;
+        saveBulkAdCost(new Date(mStart), new Date(mEnd), val).then(() => fetchCurrentView(true));
+      });
 
       if (state.charts.monthly) state.charts.monthly.destroy();
       const ctx = document.getElementById('monthlyChart').getContext('2d');
@@ -1481,9 +1594,20 @@
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${atRet.repeatRate}%</div></div>
         <div class="metric-card"><div class="metric-label">${titleOverride} Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
-        <div class="metric-card"><div class="metric-label">${titleOverride} Ad Spend</div><div class="metric-value text-loss">${fmtK(totalAdCost)}</div></div>
+        <div class="metric-card">
+          <div class="metric-label">${titleOverride} Ad Spend</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+            <input type="number" id="ad-${prefix}-total" class="inline-input" value="${totalAdCost}" style="width:70px; padding:6px;"/>
+            <button class="inline-btn primary" id="btn-ad-${prefix}-save">Save</button>
+          </div>
+        </div>
         <div class="metric-card"><div class="metric-label">${titleOverride} Net P&L</div><div class="metric-value ${atPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(atPL.profit)}</div></div>
       `;
+
+      document.getElementById(`btn-ad-${prefix}-save`)?.addEventListener('click', () => {
+        const val = document.getElementById(`ad-${prefix}-total`).value;
+        saveBulkAdCost(tMin, tMax, val).then(() => fetchCurrentView(true));
+      });
 
       // Group by YY-MM for breakdown
       const monthGroups = {};
