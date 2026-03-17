@@ -440,6 +440,10 @@
     <div style="font-size:12px; color:var(--text-muted); margin-top:8px;" id="loading-msg"></div>
   </div>
 
+  <div id="debug-log" style="position: fixed; bottom: 10px; right: 10px; width: 350px; max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.85); border: 1px solid #333; color: #00ff00; font-size: 11px; font-family: monospace; padding: 12px; border-radius: 8px; z-index: 1000; pointer-events: none; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+    <div style="color: #666; margin-bottom: 4px;">-- Debug Console --</div>
+    <div id="log-content"></div>
+  </div>
 
 
 
@@ -474,6 +478,18 @@
       charts: {},
       expandedOrders: new Set()
     };
+
+    function log(msg) {
+      console.log(msg);
+      const content = document.getElementById('log-content');
+      if (content) {
+        const div = document.createElement('div');
+        div.style.marginBottom = '2px';
+        div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        content.prepend(div);
+        if (content.children.length > 50) content.lastChild.remove();
+      }
+    }
 
     // Supabase client — initialized from Vercel environment variables via /api/config
     let sbClient = null;
@@ -752,19 +768,22 @@
 
       try {
         while (currentProxyUrl) {
-          if (pageCount > 1) {
-            showLoading(`Syncing page ${pageCount}...`);
-          }
+          log(`Fetching Shopify page ${pageCount}...`);
           
           const response = await fetch(currentProxyUrl, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
           });
-          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          if (!response.ok) {
+            const err = await response.json();
+            log(`Shopify API Error: ${JSON.stringify(err)}`);
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
           const data = await response.json();
           
           // 3. Save new orders into Supabase
           if(data.orders && data.orders.length > 0) {
+            log(`Saving ${data.orders.length} orders to Database...`);
             const toInsert = data.orders.map(o => ({
               id: o.id,
               name: o.name,
@@ -778,7 +797,7 @@
             }));
 
             const { error: insertErr } = await sbClient.from('orders').upsert(toInsert, { onConflict: 'id' });
-            if(insertErr) console.error("Supabase insert error:", insertErr);
+            if(insertErr) log("Supabase insert error: " + insertErr.message);
 
             // Save Line Items
             const lineItems = [];
@@ -801,8 +820,10 @@
 
             if (lineItems.length > 0) {
               const { error: liErr } = await sbClient.from('order_items').upsert(lineItems, { onConflict: 'id' });
-              if (liErr) console.error("Line items insert error:", liErr);
+              if (liErr) log("Line items insert error: " + liErr.message);
             }
+          } else {
+             log("No new orders found in this page.");
           }
 
           // 4. Handle Pagination
@@ -812,9 +833,7 @@
             if (nextLink) {
               const match = nextLink.match(/<(.*)>/);
               if (match) {
-                const fullUrl = match[1];
-                // Convert full Shopify URL back to our proxy format
-                const urlObj = new URL(fullUrl);
+                const urlObj = new URL(match[1]);
                 currentProxyUrl = `/shopify-api${urlObj.pathname}${urlObj.search}`;
                 pageCount++;
                 continue; // Next page
@@ -823,8 +842,9 @@
           }
           currentProxyUrl = null; // No more pages
         }
+        log("Sync complete.");
       } catch (e) {
-        console.error("Shopify Sync Error:", e);
+        log("Shopify Sync Error: " + e.message);
         throw e;
       }
     }
@@ -835,30 +855,47 @@
     let fetchFrom = minDate;
 
     if (!isForce) {
-      // Auto-sync behavior: Fetch from the latest order we have in this range forward.
-      // This is efficient for daily use but we skip the "earliestTime" check to allow
-      // backfilling if the range is extended backwards.
-      const { data: latestOrder, error: sbErr } = await sbClient
+      // Intelligent Sync: Only skip ahead if we have the START of the range covered.
+      // 1. Find the earliest order we have in this range.
+      const { data: early, error: err1 } = await sbClient
         .from('orders')
         .select('created_at')
         .gte('created_at', minDate)
         .lte('created_at', maxDate)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: true })
         .limit(1);
 
-      if (!sbErr && latestOrder && latestOrder.length > 0) {
-        let dt = new Date(latestOrder[0].created_at);
-        dt.setSeconds(dt.getSeconds() + 1); 
-        fetchFrom = dt.toISOString();
+      if (!err1 && early && early.length > 0) {
+        const earliestTime = new Date(early[0].created_at);
+        const targetMin = new Date(minDate);
+
+        // If we have data at or before the requested start, we only need to "forward fill"
+        if (earliestTime <= targetMin) {
+          const { data: late, error: err2 } = await sbClient
+            .from('orders')
+            .select('created_at')
+            .gte('created_at', minDate)
+            .lte('created_at', maxDate)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (!err2 && late && late.length > 0) {
+            let dt = new Date(late[0].created_at);
+            dt.setSeconds(dt.getSeconds() + 1); 
+            fetchFrom = dt.toISOString();
+          }
+        } else {
+          console.log(`[sync] Gap detected at start of range. Earliest local: ${early[0].created_at}, Target start: ${minDate}. Fetching from start.`);
+        }
       }
     }
 
-    // Fixed: If fetchFrom is >= maxDate, we don't need to fetch anything
     if (new Date(fetchFrom) >= new Date(maxDate) && !isForce) {
-      console.log("[sync] Range appears already synced.");
+      console.log("[sync] Range appears already synced up to " + maxDate);
       return;
     }
 
+    console.log(`[sync] Fetching from Shopify: ${fetchFrom} to ${maxDate} (isForce: ${isForce})`);
     await performSync(fetchFrom, maxDate);
   }
 
@@ -897,67 +934,70 @@
           const startDateStr = document.getElementById('sheet-start-date').value;
           const endDateStr = document.getElementById('sheet-end-date').value;
           dbMin = startDateStr; dbMax = endDateStr;
-          minDate = `${startDateStr}T00:00:00`; maxDate = `${endDateStr}T23:59:59`;
+          minDate = new Date(startDateStr + 'T00:00:00Z').toISOString();
+          maxDate = new Date(endDateStr + 'T23:59:59Z').toISOString();
         } else if (state.view === 'products') {
           const startDateStr = document.getElementById('products-start-date').value;
           const endDateStr = document.getElementById('products-end-date').value;
           dbMin = startDateStr; dbMax = endDateStr;
-          minDate = `${startDateStr}T00:00:00`; maxDate = `${endDateStr}T23:59:59`;
+          minDate = new Date(startDateStr + 'T00:00:00Z').toISOString();
+          maxDate = new Date(endDateStr + 'T23:59:59Z').toISOString();
         } else if (state.view === 'daily') {
           const startDateStr = document.getElementById('daily-start-date').value;
           const endDateStr = document.getElementById('daily-end-date').value;
           dbMin = startDateStr; dbMax = endDateStr;
-          minDate = `${startDateStr}T00:00:00`; maxDate = `${endDateStr}T23:59:59`;
+          minDate = new Date(startDateStr + 'T00:00:00Z').toISOString();
+          maxDate = new Date(endDateStr + 'T23:59:59Z').toISOString();
         } else if (state.view === 'weekly') {
           const wDate = new Date(document.getElementById('weekly-date').value);
           const wStart = getWeekStart(wDate);
           const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate() + 6);
           dbMin = toDateStr(wStart); dbMax = toDateStr(wEnd);
-          minDate = `${dbMin}T00:00:00`; maxDate = `${dbMax}T23:59:59`;
+          minDate = new Date(dbMin + 'T00:00:00Z').toISOString();
+          maxDate = new Date(dbMax + 'T23:59:59Z').toISOString();
         } else if (state.view === 'monthly') {
           const y = parseInt(document.getElementById('monthly-year').value);
           const m = parseInt(document.getElementById('monthly-month').value);
           const mStart = new Date(y, m, 1);
           const mEnd = new Date(y, m + 1, 0);
           dbMin = toDateStr(mStart); dbMax = toDateStr(mEnd);
-          minDate = `${dbMin}T00:00:00`; maxDate = `${dbMax}T23:59:59`;
+          minDate = new Date(dbMin + 'T00:00:00Z').toISOString();
+          maxDate = new Date(dbMax + 'T23:59:59Z').toISOString();
         } else if (state.view === 'custom') {
           dbMin = document.getElementById('custom-from').value;
           dbMax = document.getElementById('custom-to').value;
-          
           if (!dbMin || !dbMax) {
             alert('Please select a valid "From" and "To" date.');
-            hideLoader();
+            hideLoading();
             return;
           }
-          
-          minDate = `${dbMin}T00:00:00`; maxDate = `${dbMax}T23:59:59`;
+          minDate = new Date(dbMin + 'T00:00:00Z').toISOString();
+          maxDate = new Date(dbMax + 'T23:59:59Z').toISOString();
         } else if (state.view === 'all-time') {
-          // Check if user set explicit Custom Range picker values inside the All Time tab
           const customFrom = document.getElementById('all-time-from').value;
           const customTo = document.getElementById('all-time-to').value;
-          
           if (customFrom && customTo) {
             dbMin = customFrom;
             dbMax = customTo;
           } else {
-            // Default All Time fetch bounds
             dbMin = STORE_LAUNCH_DATE; 
             dbMax = toDateStr(new Date());
           }
-          
-          minDate = `${dbMin}T00:00:00`; maxDate = `${dbMax}T23:59:59`;
         }
+        // Use simple YYYY-MM-DD for Shopify API compatibility, but ISO for Supabase
+        const shopifyMin = dbMin;
+        const shopifyMax = dbMax;
+        minDate = new Date(dbMin + 'T00:00:00Z').toISOString();
+        maxDate = new Date(dbMax + 'T23:59:59Z').toISOString();
 
         // 1. Sync missing data from Shopify into Supabase
         try {
           if (state.view === 'sheet' || state.view === 'products') {
             await syncInventory();
           }
-          await syncShopifyToSupabase(minDate, maxDate, isForce);
+          await syncShopifyToSupabase(shopifyMin, shopifyMax, isForce);
         } catch(e) {
-          // If Shopify fails (CORS etc), we will still try to load whatever is currently in Supabase.
-          console.warn("Shopify sync failed. Falling back to cached database data if available.");
+          console.warn("Shopify sync failed. Falling back to cached database data if available.", e);
         }
         // 2. Fetch everything locally from Supabase
         state.orders = await fetchOrdersFromSupabase(minDate, maxDate);
