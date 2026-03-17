@@ -648,8 +648,8 @@
       }
       const val = parseFloat(cost) || 0;
       state.adCosts[dateStr] = val;
-      const { error } = await sbClient.from('ad_spend').upsert({ date: dateStr, amount: val });
-      if(error) console.error("Error saving ad spend:", error);
+      const { error } = await sbClient.from('ad_costs').upsert({ date: dateStr, amount: val });
+      if(error) log("Error saving ad cost: " + error.message);
     }
 
     async function saveBulkAdCost(start, end, totalCost) {
@@ -661,15 +661,15 @@
         d.setDate(d.getDate() + 1);
       }
       const dailyCost = (parseFloat(totalCost) || 0) / days.length;
-      const rows = days.map(date => ({ date, cost: dailyCost }));
+      const rows = days.map(date => ({ date, amount: dailyCost }));
       const { error } = await sbClient.from('ad_costs').upsert(rows, { onConflict: 'date' });
-      if(error) console.error("Bulk save ad cost error:", error);
+      if(error) log("Bulk save ad cost error: " + error.message);
     }
 
     async function loadAdCosts(minDate, maxDate) {
       if(!sbClient) return;
       const { data, error } = await sbClient
-        .from('ad_spend')
+        .from('ad_costs')
         .select('date, amount')
         .gte('date', minDate)
         .lte('date', maxDate);
