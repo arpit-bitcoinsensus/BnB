@@ -671,9 +671,10 @@
       // If we are opening via file://, relative fetches will fail. 
       // We assume the local proxy is on localhost:3000.
       let apiBase = '';
-      if (window.location.protocol === 'file:' || window.location.hostname === '') {
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '' || window.location.protocol === 'file:';
+      if (isLocal && window.location.port !== '3000') {
         apiBase = 'http://localhost:3000';
-        console.warn('Running from file system. Rooting API to ' + apiBase);
+        console.warn('Local dev detected. Rooting API to ' + apiBase);
       }
 
       try {
@@ -817,7 +818,8 @@
           }
         });
 
-        const apiBase = (window.location.protocol === 'file:' || window.location.hostname === '') ? 'http://localhost:3000' : '';
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '' || window.location.protocol === 'file:';
+        const apiBase = (isLocal && window.location.port !== '3000') ? 'http://localhost:3000' : '';
         const res = await fetch(apiBase + '/api/ai-insights', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
