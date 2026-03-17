@@ -502,13 +502,27 @@
   </div>  <!-- Intelligence Drawer -->
   <div id="intel-drawer" class="intel-drawer">
     <div class="intel-header">
-      <h3 style="margin:0; font-size:18px;">✨ Business Intelligence</h3>
-      <button id="btn-intel-close" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;">&times;</button>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <h3 style="margin:0; font-size:18px;">✨ Business Intelligence</h3>
+      </div>
+      <div style="display:flex; gap:12px; align-items:center;">
+        <button id="btn-ai-deep" style="background: rgba(139, 92, 246, 0.2); border: 1px solid #8b5cf6; color: #a78bfa; padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s;">DEEP AI ANALYSIS</button>
+        <button id="btn-intel-close" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;">&times;</button>
+      </div>
     </div>
-    <div class="intel-content" id="intel-content">
-      <!-- Insights rendered by JS -->
-      <div style="text-align:center; color:var(--text-muted); padding-top:40px;">
-        Analyzing store performance...
+    <div class="intel-content">
+      <div id="ai-summary-box" style="display:none; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1)); border: 1px solid rgba(139, 92, 246, 0.3); padding: 16px; border-radius: 8px; margin-bottom: 24px; animation: fadeIn 0.5s ease;">
+        <div style="font-size: 10px; color: #a78bfa; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+          <span style="display: inline-block; width: 6px; height: 6px; background: #a78bfa; border-radius: 50%; box-shadow: 0 0 8px #a78bfa;"></span>
+          Gemini AI Executive Summary
+        </div>
+        <div id="ai-summary-text" style="font-size: 14px; line-height: 1.5; color: #e4e4e7; font-style: italic;">"Analyzing store patterns..."</div>
+      </div>
+      <div id="intel-content-list">
+        <!-- Insights rendered by JS -->
+        <div style="text-align:center; color:var(--text-muted); padding-top:40px;">
+          Analyzing store performance...
+        </div>
       </div>
     </div>
   </div>
@@ -722,7 +736,7 @@
 
     // INTELLIGENCE ENGINE
     function updateIntelligence() {
-      const container = document.getElementById('intel-content');
+      const container = document.getElementById('intel-content-list');
       if (!container) return;
 
       const metrics = {
@@ -773,6 +787,72 @@
       `).join('') || '<div style="text-align:center; color:var(--text-muted); padding-top:40px;">More data needed for insights...</div>';
     }
 
+    async function fetchDeepAI() {
+      const btn = document.getElementById('btn-ai-deep');
+      const summaryBox = document.getElementById('ai-summary-box');
+      const summaryText = document.getElementById('ai-summary-text');
+      const list = document.getElementById('intel-content-list');
+
+      if (btn.disabled) return;
+
+      btn.disabled = true;
+      btn.textContent = 'THINKING...';
+      summaryBox.style.display = 'block';
+      summaryText.textContent = 'Analysing patterns and formulating strategy...';
+      
+      try {
+        const metrics = {
+          rev: 0,
+          orders: 0,
+          delivered: 0,
+          ad: Object.values(state.adCosts).reduce((a,b) => a+b, 0),
+          retention: getRetentionMetrics().repeatRate
+        };
+
+        state.orders.forEach(o => {
+          metrics.orders++;
+          if((o.tags || '').toLowerCase().includes('delivered')) {
+            metrics.delivered++;
+            metrics.rev += parseFloat(o.total_price || 0);
+          }
+        });
+
+        const apiBase = (window.location.protocol === 'file:' || window.location.hostname === '') ? 'http://localhost:3000' : '';
+        const res = await fetch(apiBase + '/api/ai-insights', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ metrics, period: state.view })
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+
+        // 1. Update Summary
+        summaryText.innerHTML = `"${data.summary}" <br><br> <span style="font-size:11px; opacity:0.6;">Powered by Gemini 1.5 Pro</span>`;
+        
+        // 2. Clear and Add AI insights to list
+        const aiInsights = [
+          ...data.dos.map(d => ({ type: 'DO', title: 'AI Recommendation', desc: d })),
+          ...data.donts.map(d => ({ type: 'DONT', title: 'AI Risk Alert', desc: d }))
+        ];
+
+        list.innerHTML = aiInsights.map(i => `
+          <div class="intel-card" style="border-left: 2px solid ${i.type === 'DO' ? '#34d399' : '#f87171'};">
+            <span class="intel-badge ${i.type === 'DO' ? 'badge-do' : 'badge-dont'}">${i.type === 'DO' ? 'Live AI: DO' : 'Live AI: DONT'}</span>
+            <div class="intel-title">${i.title}</div>
+            <div class="intel-desc">${i.desc}</div>
+          </div>
+        `).join('');
+
+      } catch (err) {
+        log("AI Analysis failed: " + err.message);
+        summaryText.textContent = "Error: " + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'REFRESH AI';
+      }
+    }
+
     // Setup Listeners
     document.addEventListener('DOMContentLoaded', () => {
       checkAuth();
@@ -785,6 +865,7 @@
       document.getElementById('btn-intel-close')?.addEventListener('click', () => {
         document.getElementById('intel-drawer').classList.remove('active');
       });
+      document.getElementById('btn-ai-deep')?.addEventListener('click', fetchDeepAI);
     });
     function getWeekStart(d) {
       const day = d.getDay();

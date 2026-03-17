@@ -12,6 +12,67 @@ app.use(express.json());
 const SHOPIFY_STORE_URL = process.env.SHOPIFY_STORE_URL;
 const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET;
 const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID || '';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+// AI Insights endpoint
+app.post('/api/ai-insights', async (req, res) => {
+  try {
+    if (!GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY not configured on server.' });
+    }
+
+    const { metrics, period } = req.body;
+    
+    const prompt = `
+      You are a world-class E-commerce Business Analyst for "BnB Toys".
+      Analyze these store metrics for the period: ${period}
+      
+      METRICS:
+      - Total Revenue: ₹${metrics.rev}
+      - Total Orders: ${metrics.orders}
+      - Delivered Orders: ${metrics.delivered}
+      - Ad Spend: ₹${metrics.ad}
+      - Repeat Customer Rate: ${metrics.retention}%
+      
+      TASK:
+      Provide a highly strategic analysis.
+      1. Give a 1-sentence executive summary of store health.
+      2. Provide 3 specific "Do's" (Strategic actions to scale or improve).
+      3. Provide 3 specific "Don'ts" (Risks or inefficient behaviors to stop).
+      
+      FORMAT: Return JSON exactly like this:
+      {
+        "summary": "...",
+        "dos": ["...", "...", "..."],
+        "donts": ["...", "...", "..."]
+      }
+    `;
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const geminiResp = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { response_mime_type: "application/json" }
+      })
+    });
+
+    if (!geminiResp.ok) {
+      const err = await geminiResp.text();
+      throw new Error(`Gemini API failed: ${err}`);
+    }
+
+    const result = await geminiResp.json();
+    const aiText = result.candidates[0].content.parts[0].text;
+    res.json(JSON.parse(aiText));
+
+  } catch (err) {
+    console.error('[AI Proxy Error]:', err.message);
+    res.status(500).json({ error: 'AI Analysis failed: ' + err.message });
+  }
+});
 
 // In-memory token cache
 const tokenCache = {};
