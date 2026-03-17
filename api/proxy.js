@@ -22,7 +22,7 @@ app.post('/api/ai-insights', async (req, res) => {
     }
 
     const { metrics, period } = req.body;
-    
+
     const prompt = `
       You are a world-class E-commerce Business Analyst for "BnB Toys".
       Analyze these store metrics for the period: ${period}
@@ -48,8 +48,9 @@ app.post('/api/ai-insights', async (req, res) => {
       }
     `;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-    
+    console.log(`[proxy] Requesting AI insights for period: ${period}...`);
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
+
     const geminiResp = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -115,8 +116,8 @@ async function getAccessToken(storeUrl, clientId, clientSecret) {
 app.get('/shopify-api/*path', async (req, res) => {
   try {
     if (!SHOPIFY_STORE_URL || !SHOPIFY_CLIENT_SECRET) {
-      return res.status(500).json({ 
-        error: 'Missing Shopify credentials. Please set SHOPIFY_STORE_URL and SHOPIFY_CLIENT_SECRET in environment variables.' 
+      return res.status(500).json({
+        error: 'Missing Shopify credentials. Please set SHOPIFY_STORE_URL and SHOPIFY_CLIENT_SECRET in environment variables.'
       });
     }
 
