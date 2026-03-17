@@ -980,12 +980,7 @@
       }
     }
 
-    if (new Date(fetchFrom) >= new Date(maxDate) && !isForce) {
-      console.log("[sync] Range appears already synced up to " + maxDate);
-      return;
-    }
-
-    console.log(`[sync] Fetching from Shopify: ${fetchFrom} to ${maxDate} (isForce: ${isForce})`);
+    log(`[sync] Sync range: ${minDate} to ${maxDate} (isForce: ${isForce})`);
     await performSync(fetchFrom, maxDate);
   }
 
@@ -1074,9 +1069,7 @@
             dbMax = toDateStr(new Date());
           }
         }
-        // Use simple YYYY-MM-DD for Shopify API compatibility, but ISO for Supabase
-        const shopifyMin = dbMin;
-        const shopifyMax = dbMax;
+        // Use full ISO timestamps to ensure entire days (including today) are covered
         minDate = new Date(dbMin + 'T00:00:00Z').toISOString();
         maxDate = new Date(dbMax + 'T23:59:59Z').toISOString();
 
@@ -1085,9 +1078,9 @@
           if (state.view === 'sheet' || state.view === 'products') {
             await syncInventory();
           }
-          await syncShopifyToSupabase(shopifyMin, shopifyMax, isForce);
+          await syncShopifyToSupabase(minDate, maxDate, isForce);
         } catch(e) {
-          console.warn("Shopify sync failed. Falling back to cached database data if available.", e);
+          log("Shopify sync failed: " + e.message);
         }
         // 2. Fetch everything locally from Supabase
         state.orders = await fetchOrdersFromSupabase(minDate, maxDate);
