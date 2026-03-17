@@ -871,23 +871,34 @@
           }
           const data = await response.json();
           
-          // 3. Save new orders into Supabase
+          // 3. Save new orders into Supabase (Dynamic Column Handling)
           if(data.orders && data.orders.length > 0) {
             log(`Saving ${data.orders.length} orders to Database...`);
-            const toInsert = data.orders.map(o => ({
-              id: o.id,
-              name: o.name,
-              created_at: o.created_at,
-              total_price: o.total_price,
-              tags: o.tags,
-              fulfillment_status: o.fulfillment_status,
-              financial_status: o.financial_status,
-              customer_fn: o.customer ? o.customer.first_name : null,
-              customer_ln: o.customer ? o.customer.last_name : null
-            }));
+            
+            const ordersToInsert = data.orders.map(o => {
+              const row = {
+                id: o.id,
+                name: o.name,
+                created_at: o.created_at,
+                total_price: o.total_price,
+                tags: o.tags,
+                customer_fn: o.customer ? o.customer.first_name : null,
+                customer_ln: o.customer ? o.customer.last_name : null
+              };
+              // Only add these if they were successfully added to your DB schema
+              if (o.fulfillment_status) row.fulfillment_status = o.fulfillment_status;
+              if (o.financial_status) row.financial_status = o.financial_status;
+              return row;
+            });
 
-            const { error: insertErr } = await sbClient.from('orders').upsert(toInsert, { onConflict: 'id' });
-            if(insertErr) log("Supabase insert error: " + insertErr.message);
+            const { error: insertErr } = await sbClient.from('orders').upsert(ordersToInsert, { onConflict: 'id' });
+            
+            if (insertErr) {
+              log("Supabase insert error: " + insertErr.message);
+              if (insertErr.message.includes("column")) {
+                log("⚠️ CRITICAL: Your database is missing columns. Please run the SQL fix I sent you!");
+              }
+            }
 
             // Save Line Items
             const lineItems = [];
