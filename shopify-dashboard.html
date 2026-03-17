@@ -440,9 +440,22 @@
     <div style="font-size:12px; color:var(--text-muted); margin-top:8px;" id="loading-msg"></div>
   </div>
 
-  <div id="debug-log" style="position: fixed; bottom: 10px; right: 10px; width: 350px; max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.85); border: 1px solid #333; color: #00ff00; font-size: 11px; font-family: monospace; padding: 12px; border-radius: 8px; z-index: 1000; pointer-events: none; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-    <div style="color: #666; margin-bottom: 4px;">-- Debug Console --</div>
-    <div id="log-content"></div>
+  <!-- Interactive Debug Console -->
+  <div id="debug-log" style="position: fixed; bottom: 20px; right: 20px; width: 400px; height: 250px; background: rgba(0,0,0,0.9); border: 1px solid #444; color: #00ff00; font-size: 11px; font-family: 'Consolas', monospace; border-radius: 10px; z-index: 2000; box-shadow: 0 8px 32px rgba(0,0,0,0.6); display: flex; flex-direction: column; overflow: hidden; resize: both; min-width: 250px; min-height: 36px; transition: height 0.2s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px);">
+    <div id="debug-header" style="background: #1a1a1a; padding: 8px 12px; cursor: move; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; user-select: none; flex-shrink: 0;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="width: 8px; height: 8px; background: #00ff00; border-radius: 50%; box-shadow: 0 0 8px #00ff00;"></div>
+        <span style="color: #888; font-weight: 700; letter-spacing: 1px; font-size: 10px;">SYSTEM DEBUG</span>
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <button id="debug-min" style="background: none; border: none; color: #666; cursor: pointer; padding: 0 4px; font-size: 16px; transition: color 0.2s;">−</button>
+        <button id="debug-toggle-visibility" style="background: none; border: none; color: #666; cursor: pointer; padding: 0 4px; font-size: 14px; transition: color 0.2s;">👁️</button>
+      </div>
+    </div>
+    <div id="log-content-container" style="flex: 1; overflow-y: auto; padding: 12px; pointer-events: auto;">
+      <div style="color: #555; margin-bottom: 8px; font-style: italic; border-bottom: 1px solid #222; padding-bottom: 4px;">Waiting for system events...</div>
+      <div id="log-content"></div>
+    </div>
   </div>
 
 
@@ -478,6 +491,83 @@
       charts: {},
       expandedOrders: new Set()
     };
+
+    // Debug Console Interactivity
+    (function setupDebugConsole() {
+      const debugLog = document.getElementById('debug-log');
+      const header = document.getElementById('debug-header');
+      const minBtn = document.getElementById('debug-min');
+      const toggleVisBtn = document.getElementById('debug-toggle-visibility');
+      const logContainer = document.getElementById('log-content-container');
+
+      if (!debugLog || !header) return;
+
+      let isMinimized = false;
+      let isHidden = false;
+      let lastHeight = '250px';
+
+      // 1. Minimize / Maximize
+      minBtn.onclick = (e) => {
+        e.stopPropagation();
+        isMinimized = !isMinimized;
+        if (isMinimized) {
+          lastHeight = debugLog.getBoundingClientRect().height + 'px';
+          debugLog.style.height = '36px';
+          logContainer.style.display = 'none';
+          minBtn.textContent = '+';
+          debugLog.style.resize = 'none';
+        } else {
+          debugLog.style.height = lastHeight;
+          logContainer.style.display = 'block';
+          minBtn.textContent = '−';
+          debugLog.style.resize = 'both';
+        }
+      };
+
+      // 2. Hide / Show Logs
+      toggleVisBtn.onclick = (e) => {
+        e.stopPropagation();
+        isHidden = !isHidden;
+        logContainer.style.visibility = isHidden ? 'hidden' : 'visible';
+        toggleVisBtn.style.color = isHidden ? '#f87171' : '#666';
+        logContainer.style.opacity = isHidden ? '0' : '1';
+      };
+
+      // 3. Dragging Logic
+      let isDragging = false;
+      let startX, startY;
+      let startLeft, startTop;
+
+      header.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = debugLog.getBoundingClientRect();
+        startLeft = rect.left;
+        startTop = rect.top;
+        debugLog.style.transition = 'none';
+        debugLog.style.bottom = 'auto';
+        debugLog.style.right = 'auto';
+        debugLog.style.left = startLeft + 'px';
+        debugLog.style.top = startTop + 'px';
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        debugLog.style.left = (startLeft + dx) + 'px';
+        debugLog.style.top = (startTop + dy) + 'px';
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          debugLog.style.transition = 'height 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
+        }
+      });
+    })();
 
     function log(msg) {
       console.log(msg);
