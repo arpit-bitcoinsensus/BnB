@@ -182,6 +182,28 @@
     .order-tag { font-size: 10px; padding: 2px 8px; border-radius: 4px; background: #27272a; color: #e4e4e7; border: 1px solid #3f3f46; margin-right: 4px; }
 
     .empty-state { padding: 80px; text-align: center; color: var(--text-muted); font-size: 15px; }
+
+    /* Passcode Overlay */
+    .login-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #09090b; z-index: 10000; display: flex; justify-content: center; align-items: center; flex-direction: column; backdrop-filter: blur(20px); }
+    .login-box { background: rgba(24, 24, 27, 0.8); padding: 40px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); width: 100%; max-width: 400px; text-align: center; box-shadow: 0 24px 48px rgba(0,0,0,0.5); }
+    .login-box h2 { margin: 0 0 8px 0; color: white; font-size: 24px; }
+    .login-box p { color: var(--text-muted); margin-bottom: 24px; font-size: 14px; }
+    .login-input { width: 100%; padding: 12px 16px; background: #09090b; border: 1px solid var(--border); border-radius: 8px; color: white; margin-bottom: 16px; text-align: center; font-size: 18px; letter-spacing: 4px; }
+    
+    /* Intelligence Drawer */
+    .intel-drawer { position: fixed; top: 0; right: -450px; width: 450px; height: 100%; background: #09090b; border-left: 1px solid var(--border); z-index: 3000; transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-shadow: -20px 0 60px rgba(0,0,0,0.8); }
+    .intel-drawer.active { right: 0; }
+    .intel-header { padding: 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #18181b; }
+    .intel-content { flex: 1; overflow-y: auto; padding: 24px; }
+    .intel-card { background: #18181b; border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; animation: fadeInUp 0.4s ease backwards; }
+    .intel-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; margin-bottom: 10px; display: inline-block; }
+    .badge-do { background: #064e3b; color: #34d399; }
+    .badge-dont { background: #450a0a; color: #f87171; }
+    .intel-title { font-weight: 600; font-size: 15px; margin-bottom: 8px; color: white; }
+    .intel-desc { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+    
+    #btn-intel-toggle { background: linear-gradient(135deg, #8b5cf6, #3b82f6); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform 0.2s; }
+    #btn-intel-toggle:hover { transform: scale(1.05); }
   </style>
 </head>
 <body>
@@ -190,6 +212,9 @@
     <header>
       <h1>Shopify Analytics</h1>
       <div class="header-controls">
+        <button id="btn-intel-toggle">
+          <span>✨</span> Intelligence
+        </button>
         <span id="conn-badge" class="badge live" style="display:none;"></span>
         <button id="btn-sync-now" class="primary">
 
@@ -474,11 +499,30 @@
       <div style="color: #555; margin-bottom: 8px; font-style: italic; border-bottom: 1px solid #222; padding-bottom: 4px;">Waiting for system events...</div>
       <div id="log-content"></div>
     </div>
+  </div>  <!-- Intelligence Drawer -->
+  <div id="intel-drawer" class="intel-drawer">
+    <div class="intel-header">
+      <h3 style="margin:0; font-size:18px;">✨ Business Intelligence</h3>
+      <button id="btn-intel-close" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;">&times;</button>
+    </div>
+    <div class="intel-content" id="intel-content">
+      <!-- Insights rendered by JS -->
+      <div style="text-align:center; color:var(--text-muted); padding-top:40px;">
+        Analyzing store performance...
+      </div>
+    </div>
   </div>
 
-
-
-
+  <!-- Passcode Overlay -->
+  <div id="login-overlay" class="login-overlay">
+    <div class="login-box">
+      <h2>Welcome Back</h2>
+      <p>Enter your secure passcode to access BnB Analytics.</p>
+      <input type="password" id="passcode-input" class="login-input" placeholder="••••">
+      <div id="login-error" style="color: #f87171; font-size: 13px; margin-top: -8px; margin-bottom: 12px; display: none;">Incorrect passcode. Please try again.</div>
+      <button id="btn-login" class="primary" style="width: 100%; padding: 12px;">Unlock Dashboard</button>
+    </div>
+  </div>
   <!-- UMD Build of Chart.js & Supabase JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -651,6 +695,97 @@
         String(d.getMonth() + 1).padStart(2, '0') + '-' +
         String(d.getDate()).padStart(2, '0');
     }
+
+    // AUTHENTICATION
+    function checkAuth() {
+      const auth = localStorage.getItem('bnb_auth');
+      const expiry = localStorage.getItem('bnb_auth_expiry');
+      if (auth === 'true' && expiry && Date.now() < parseInt(expiry)) {
+        document.getElementById('login-overlay').style.display = 'none';
+      }
+    }
+
+    function handleLogin() {
+      const input = document.getElementById('passcode-input');
+      const error = document.getElementById('login-error');
+      if (input.value === 'bnbmeta') {
+        localStorage.setItem('bnb_auth', 'true');
+        localStorage.setItem('bnb_auth_expiry', (Date.now() + 24 * 60 * 60 * 1000).toString());
+        document.getElementById('login-overlay').style.animation = 'fadeOut 0.5s forwards';
+        setTimeout(() => document.getElementById('login-overlay').style.display = 'none', 500);
+      } else {
+        error.style.display = 'block';
+        input.value = '';
+        input.focus();
+      }
+    }
+
+    // INTELLIGENCE ENGINE
+    function updateIntelligence() {
+      const container = document.getElementById('intel-content');
+      if (!container) return;
+
+      const metrics = {
+        rev: 0,
+        orders: 0,
+        delivered: 0,
+        ad: Object.values(state.adCosts).reduce((a,b) => a+b, 0)
+      };
+
+      state.orders.forEach(o => {
+        metrics.orders++;
+        const isDel = (o.tags || '').toLowerCase().includes('delivered');
+        if (isDel) {
+          metrics.delivered++;
+          metrics.rev += parseFloat(o.total_price || 0);
+        }
+      });
+
+      const adRatio = metrics.rev > 0 ? (metrics.ad / metrics.rev * 100).toFixed(1) : 0;
+      const profitData = calcPL(metrics.rev, metrics.delivered, metrics.ad);
+      const profitMargin = metrics.rev > 0 ? (profitData.profit / metrics.rev * 100).toFixed(1) : 0;
+
+      const insights = [];
+
+      if (adRatio > 30) {
+        insights.push({ type: 'DONT', title: 'High Ad Burn', desc: `Ads are consuming ${adRatio}% of revenue. Suggestion: Audit your targeting before scaling.` });
+      } else if (adRatio < 15 && metrics.rev > 5000) {
+        insights.push({ type: 'DO', title: 'Scale Opportunity', desc: `High efficiency detected (${adRatio}%). Suggestion: Increase budget for winners.` });
+      }
+
+      if (profitMargin < 15 && metrics.rev > 0) {
+        insights.push({ type: 'DONT', title: 'Margin Squeeze', desc: `Net margin at ${profitMargin}%. Don't run deep discounts; focus on AOV.` });
+      } else if (profitMargin >= 30) {
+        insights.push({ type: 'DO', title: 'Healthy Profits', desc: `Strong ${profitMargin}% margin! Do reinvest in bulk inventory for Star products.` });
+      }
+
+      const retention = getRetentionMetrics();
+      if (retention.repeatRate < 10) {
+        insights.push({ type: 'DO', title: 'Focus on Retention', desc: `Only ${retention.repeatRate}% repeat rate. Do launch a loyalty email sequence.` });
+      }
+
+      container.innerHTML = insights.map(i => `
+        <div class="intel-card">
+          <span class="intel-badge ${i.type === 'DO' ? 'badge-do' : 'badge-dont'}">${i.type === 'DO' ? 'Strategic Do' : 'Watch Out'}</span>
+          <div class="intel-title">${i.title}</div>
+          <div class="intel-desc">${i.desc}</div>
+        </div>
+      `).join('') || '<div style="text-align:center; color:var(--text-muted); padding-top:40px;">More data needed for insights...</div>';
+    }
+
+    // Setup Listeners
+    document.addEventListener('DOMContentLoaded', () => {
+      checkAuth();
+      document.getElementById('btn-login')?.addEventListener('click', handleLogin);
+      document.getElementById('passcode-input')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
+      document.getElementById('btn-intel-toggle')?.addEventListener('click', () => {
+        document.getElementById('intel-drawer').classList.add('active');
+        updateIntelligence();
+      });
+      document.getElementById('btn-intel-close')?.addEventListener('click', () => {
+        document.getElementById('intel-drawer').classList.remove('active');
+      });
+    });
     function getWeekStart(d) {
       const day = d.getDay();
       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
@@ -1141,6 +1276,11 @@
         else if (state.view === 'weekly') renderWeekly(new Date(dbMin), new Date(dbMax));
         else if (state.view === 'monthly') renderMonthly(new Date(dbMin), new Date(dbMax));
         else if (state.view === 'all-time') renderAllTime(new Date(dbMin), new Date(dbMax), 'all-time');
+        
+        // Auto-update Intelligence if open
+        if (document.getElementById('intel-drawer').classList.contains('active')) {
+          updateIntelligence();
+        }
 
       } catch (error) {
         console.error("Error updating view:", error);
