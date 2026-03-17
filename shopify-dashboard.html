@@ -163,10 +163,12 @@
     /* Sheet View Specific */
     .sheet-container { background: var(--surface); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 32px; }
     .sheet-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
-    .sheet-table th { background: #18181b; padding: 12px 16px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+    .sheet-table th { background: #18181b; padding: 12px 16px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); border-bottom: 1px solid var(--border); position: sticky; top: 0; transition: background 0.2s; }
+    .sheet-table th:hover { background: #27272a; cursor: pointer; color: white; }
     .sheet-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .sheet-table tr.order-row:hover { background: #1a1a1a; cursor: pointer; }
     .sheet-table tr.expanded { background: #09090b; }
+    .sort-icon { color: var(--primary); font-size: 10px; margin-left: 4px; opacity: 0.8; }
     
     .mini-dashboard { padding: 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; animation: fadeInUp 0.3s ease; }
     .mini-card { background: #18181b; padding: 16px; border-radius: 8px; border: 1px solid var(--border); }
@@ -223,6 +225,22 @@
           <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
         </div>
       </div>
+      
+      <div class="controls-bar" style="margin-top: -16px; background: rgba(255,255,255,0.02); border-top: none;">
+        <div style="display: flex; gap: 16px; align-items: center; flex: 1;">
+          <div style="position: relative; flex: 1; max-width: 400px;">
+            <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #666;">🔍</span>
+            <input type="text" id="sheet-search" placeholder="Search orders, customers, or tags..." style="width: 100%; padding: 8px 12px 8px 36px; background: #09090b; border: 1px solid var(--border); border-radius: 6px; color: white; font-size: 13px;">
+          </div>
+          <select id="sheet-filter-status" style="padding: 8px 12px; background: #09090b; border: 1px solid var(--border); border-radius: 6px; color: white; font-size: 13px; min-width: 140px;">
+            <option value="all">All Statuses</option>
+            <option value="delivered">Delivered Only</option>
+            <option value="paid">Paid Only</option>
+            <option value="pending">Pending Only</option>
+            <option value="fulfillment_pending">Unfulfilled Only</option>
+          </select>
+        </div>
+      </div>
 
       <div id="stock-alerts-container" style="margin-bottom: 24px;"></div>
 
@@ -231,12 +249,12 @@
           <table class="sheet-table">
             <thead>
               <tr>
-                <th style="width: 100px;">Order</th>
-                <th style="width: 140px;">Customer</th>
-                <th style="width: 100px;">Total</th>
+                <th style="width: 100px; cursor: pointer;" onclick="setSheetSort('name')">Order <span id="sort-name" class="sort-icon"></span></th>
+                <th style="width: 140px; cursor: pointer;" onclick="setSheetSort('customer')">Customer <span id="sort-customer" class="sort-icon"></span></th>
+                <th style="width: 100px; cursor: pointer;" onclick="setSheetSort('total_price')">Total <span id="sort-total_price" class="sort-icon"></span></th>
                 <th style="width: 80px;">Status</th>
                 <th>Tags</th>
-                <th style="width: 120px;">Date</th>
+                <th style="width: 120px; cursor: pointer;" onclick="setSheetSort('created_at')">Date <span id="sort-created_at" class="sort-icon"></span></th>
               </tr>
             </thead>
             <tbody id="sheet-tbody">
@@ -489,7 +507,13 @@
       orders: [],
       adCosts: {},
       charts: {},
-      expandedOrders: new Set()
+      expandedOrders: new Set(),
+      sheetFilters: {
+        search: '',
+        status: 'all',
+        sortCol: 'created_at',
+        sortDir: 'desc'
+      }
     };
 
     // Debug Console Interactivity
@@ -697,7 +721,16 @@
       Chart.defaults.font.family = "'Inter', sans-serif";
     }
 
-    // Tab Logic
+    document.getElementById('sheet-search')?.addEventListener('input', (e) => {
+      state.sheetFilters.search = e.target.value;
+      renderSheet();
+    });
+    document.getElementById('sheet-filter-status')?.addEventListener('change', (e) => {
+      state.sheetFilters.status = e.target.value;
+      renderSheet();
+    });
+    document.getElementById('btn-fetch-sheet')?.addEventListener('click', () => fetchCurrentView(true));
+
     document.querySelectorAll('.tab').forEach(t => {
       t.addEventListener('click', (e) => {
         document.querySelectorAll('.tab').forEach(tb => tb.classList.remove('active'));
@@ -1126,16 +1159,76 @@
       renderSheet();
     }
 
+    function setSheetSort(col) {
+      if (state.sheetFilters.sortCol === col) {
+        state.sheetFilters.sortDir = state.sheetFilters.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.sheetFilters.sortCol = col;
+        state.sheetFilters.sortDir = 'desc'; // Default to newest/highest first
+      }
+      renderSheet();
+    }
+
     function renderSheet() {
       const tbody = document.getElementById('sheet-tbody');
       const summary = document.getElementById('sheet-summary');
+      if (!tbody) return;
       tbody.innerHTML = '';
       
+      // Update Sort Icons
+      document.querySelectorAll('.sort-icon').forEach(el => el.textContent = '');
+      const currentSortIcon = document.getElementById('sort-' + state.sheetFilters.sortCol);
+      if (currentSortIcon) {
+        currentSortIcon.textContent = state.sheetFilters.sortDir === 'asc' ? ' 🔼' : ' 🔽';
+      }
+
       let totalRev = 0;
       let totalDelivered = 0;
       let totalAd = 0;
 
-      state.orders.forEach(o => {
+      // 1. FILTER
+      let filtered = state.orders.filter(o => {
+        // Status Filter
+        const tCounts = categorizeOrders([o]);
+        if (state.sheetFilters.status === 'delivered' && tCounts['Delivered'] === 0) return false;
+        if (state.sheetFilters.status === 'paid' && o.financial_status?.toLowerCase() !== 'paid') return false;
+        if (state.sheetFilters.status === 'pending' && o.financial_status?.toLowerCase() === 'paid') return false;
+        if (state.sheetFilters.status === 'fulfillment_pending' && o.fulfillment_status) return false;
+
+        // Search Filter
+        if (state.sheetFilters.search) {
+          const s = state.sheetFilters.search.toLowerCase();
+          const nameMatch = o.name?.toLowerCase().includes(s);
+          const custMatch = (o.customer?.first_name + ' ' + o.customer?.last_name).toLowerCase().includes(s);
+          const tagMatch = o.tags?.toLowerCase().includes(s);
+          if (!nameMatch && !custMatch && !tagMatch) return false;
+        }
+        return true;
+      });
+
+      // 2. SORT
+      filtered.sort((a, b) => {
+        let valA, valB;
+        const col = state.sheetFilters.sortCol;
+        
+        if (col === 'total_price') {
+          valA = parseFloat(a.total_price) || 0;
+          valB = parseFloat(b.total_price) || 0;
+        } else if (col === 'customer') {
+          valA = (a.customer?.first_name || '') + (a.customer?.last_name || '');
+          valB = (b.customer?.first_name || '') + (b.customer?.last_name || '');
+        } else {
+          valA = a[col] || '';
+          valB = b[col] || '';
+        }
+
+        if (valA < valB) return state.sheetFilters.sortDir === 'asc' ? -1 : 1;
+        if (valA > valB) return state.sheetFilters.sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+
+      // 3. RENDER
+      filtered.forEach(o => {
         const isExpanded = state.expandedOrders.has(o.id);
         const tCounts = categorizeOrders([o]);
         const isDelivered = tCounts['Delivered'] > 0;
