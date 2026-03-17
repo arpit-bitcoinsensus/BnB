@@ -617,7 +617,7 @@
       }
       if (!document.getElementById('sheet-start-date').value) {
         let d = new Date(now);
-        d.setDate(d.getDate() - 7);
+        d.setDate(d.getDate() - 30);
         document.getElementById('sheet-start-date').value = toDateStr(d);
       }
       if (!document.getElementById('sheet-end-date').value) {
@@ -835,8 +835,10 @@
     let fetchFrom = minDate;
 
     if (!isForce) {
-      // Find the LATEST order in this range to see if we can "forward-fill"
-      const { data: latestOrder, error: sbErr1 } = await sbClient
+      // Auto-sync behavior: Fetch from the latest order we have in this range forward.
+      // This is efficient for daily use but we skip the "earliestTime" check to allow
+      // backfilling if the range is extended backwards.
+      const { data: latestOrder, error: sbErr } = await sbClient
         .from('orders')
         .select('created_at')
         .gte('created_at', minDate)
@@ -844,27 +846,17 @@
         .order('created_at', { ascending: false })
         .limit(1);
 
-      // Find the EARLIEST order in this range to see if we need to "back-fill"
-      const { data: earliestOrder, error: sbErr2 } = await sbClient
-        .from('orders')
-        .select('created_at')
-        .gte('created_at', minDate)
-        .lte('created_at', maxDate)
-        .order('created_at', { ascending: true })
-        .limit(1);
-
-      if (!sbErr1 && latestOrder && latestOrder.length > 0) {
-        // We have some data. If the earliest we have is already <= our minDate, 
-        // we only forward-fill. Otherwise, we just fetch from minDate.
-        const earliestTime = new Date(earliestOrder[0].created_at);
-        const targetMin = new Date(minDate);
-
-        if (earliestTime <= targetMin) {
-          let dt = new Date(latestOrder[0].created_at);
-          dt.setSeconds(dt.getSeconds() + 1); 
-          fetchFrom = dt.toISOString();
-        }
+      if (!sbErr && latestOrder && latestOrder.length > 0) {
+        let dt = new Date(latestOrder[0].created_at);
+        dt.setSeconds(dt.getSeconds() + 1); 
+        fetchFrom = dt.toISOString();
       }
+    }
+
+    // Fixed: If fetchFrom is >= maxDate, we don't need to fetch anything
+    if (new Date(fetchFrom) >= new Date(maxDate) && !isForce) {
+      console.log("[sync] Range appears already synced.");
+      return;
     }
 
     await performSync(fetchFrom, maxDate);
@@ -1203,12 +1195,13 @@
           
           const colMap = {
             id: headers.indexOf('id') !== -1 ? headers.indexOf('id') : headers.indexOf('order'),
-            name: headers.indexOf('name') !== -1 ? headers.indexOf('name') : headers.indexOf('order'),
+            name: headers.indexOf('name') !== -1 ? headers.indexOf('name') : headers.indexOf('order #'),
             date: headers.indexOf('created at') !== -1 ? headers.indexOf('created at') : headers.indexOf('date'),
             total: headers.indexOf('total') !== -1 ? headers.indexOf('total') : headers.indexOf('amount'),
             tags: headers.indexOf('tags'),
             customer_fn: headers.indexOf('first name'),
-            customer_ln: headers.indexOf('last name')
+            customer_ln: headers.indexOf('last name'),
+            customer_email: headers.indexOf('email')
           };
 
           if (colMap.name === -1 || colMap.date === -1 || colMap.total === -1) {
@@ -1233,7 +1226,8 @@
               fulfillment_status: 'fulfilled', // default for historical
               financial_status: 'paid', // default for historical
               customer_fn: colMap.customer_fn !== -1 ? row[colMap.customer_fn] : null,
-              customer_ln: colMap.customer_ln !== -1 ? row[colMap.customer_ln] : null
+              customer_ln: colMap.customer_ln !== -1 ? row[colMap.customer_ln] : null,
+              customer_email: colMap.customer_email !== -1 ? row[colMap.customer_email] : null
             });
           }
 
