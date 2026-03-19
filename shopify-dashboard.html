@@ -1231,6 +1231,7 @@
         totalProductCost = (deliveredCount || 0) * PRODUCT_COST;
         totalLogisticsCost = (fulfilledCount || deliveredCount || 0) * SHIPPING_COST;
         totalRevenue = revenue;
+        if (!shopifyGrossSales) shopifyGrossSales = revenue;
       }
 
       const totalCost = totalProductCost + totalLogisticsCost + adCost;
@@ -1244,7 +1245,8 @@
         totalCost, 
         profit, 
         deliveredCount, 
-        fulfilledCount: fulfilledCount || deliveredCount 
+        fulfilledCount: fulfilledCount || deliveredCount,
+        shopifyGrossSales
       };
     }
 
@@ -1510,9 +1512,9 @@
           return;
         }
 
-        // Use full ISO timestamps to ensure entire days (including today) are covered
-        minDate = new Date(dbMin + 'T00:00:00Z').toISOString();
-        maxDate = new Date(dbMax + 'T23:59:59Z').toISOString();
+        // Use full ISO timestamps for IST (00:00:00+05:30 to 23:59:59+05:30)
+        minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
+        maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
 
         // 1. Sync missing data from Shopify into Supabase
         try {
@@ -2102,7 +2104,8 @@
           }
         });
 
-        const pl = calcPL(revenue, deliveredCount, adCost, fulfilledCount, allDayItems);
+        const totalShopifySales = dayOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
+        const pl = calcPL(revenue, deliveredCount, adCost, fulfilledCount, allDayItems, totalShopifySales);
 
         const prettyDate = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
@@ -2246,7 +2249,8 @@
             dItems.push({...li, sku: lookupKey, isDelivered: isDel, isFulfilled: isFul});
           });
         });
-        const dPL = calcPL(dRev, dDel, dAd, dFul, dItems);
+        const dTotalSales = dOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
+        const dPL = calcPL(dRev, dDel, dAd, dFul, dItems, dTotalSales);
 
         totalOrders += dOrders.length;
         totalRevenue += dRev;
@@ -2260,17 +2264,15 @@
           orders: dOrders.length,
           delivered: dDel,
           canceled: dCanc,
-          profit: dPL.profit
+          profit: dPL.profit,
+          totalSales: dTotalSales,
+          items: dItems
         });
       }
 
-      const allItems = [];
-      state.orders.forEach(o => {
-        const isDel = categorizeOrders([o])['Delivered'] > 0;
-        const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
-        if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
-      });
-      const wPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allItems);
+      const allViewItems = daysData.flatMap(d => d.items);
+      const totalShopifySales = daysData.reduce((sum, d) => sum + d.totalSales, 0);
+      const wPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allViewItems, totalShopifySales);
       const wRet = getRetentionMetrics();
 
       document.getElementById('weekly-metrics').innerHTML = `
@@ -2327,8 +2329,9 @@
       let totalCanceled = 0;
       let totalTransit = 0;
       let totalAdCost = 0;
+      let totalShopifySales = 0;
       
-      let daysData = [];
+      let allItems = [];
 
       for (var d = new Date(mStart); d <= mEnd; d.setDate(d.getDate() + 1)) {
         const dStr = toDateStr(d);
@@ -2343,6 +2346,13 @@
         const dFul = tCounts['Fulfilled'] || 0;
         const dAd = state.adCosts[dStr] || 0;
 
+        dOrders.forEach(o => {
+          const isDel = categorizeOrders([o])['Delivered'] > 0;
+          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
+          if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
+        });
+        const dTotalSales = dOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
+
         totalOrders += dOrders.length;
         totalRevenue += dRev;
         totalDelivered += dDel;
@@ -2350,21 +2360,10 @@
         totalCanceled += tCounts['Canceled'] || 0;
         totalTransit += tCounts['In Transit'] || 0;
         totalAdCost += dAd;
-
-        daysData.push({
-          day: d.getDate(),
-          orders: dOrders.length,
-          delivered: dDel
-        });
+        totalShopifySales += dTotalSales;
       }
 
-      const allItems = [];
-      state.orders.forEach(o => {
-        const isDel = categorizeOrders([o])['Delivered'] > 0;
-        const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
-        if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
-      });
-      const mPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allItems);
+      const mPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allItems, totalShopifySales);
       const mRet = getRetentionMetrics();
 
       document.getElementById('monthly-metrics').innerHTML = `
@@ -2397,10 +2396,29 @@
       state.charts.monthly = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: daysData.map(d => d.day),
+          labels: Array.from({length: mEnd.getDate()}, (_, i) => i + 1), // Days of the month
           datasets: [
-            { label: 'Total Orders', data: daysData.map(d => d.orders), backgroundColor: '#fbbf24' },
-            { label: 'Delivered', data: daysData.map(d => d.delivered), backgroundColor: '#34d399' }
+            { label: 'Total Orders', data: Array.from({length: mEnd.getDate()}, (_, i) => {
+                const day = i + 1;
+                const dStr = toDateStr(new Date(mStart.getFullYear(), mStart.getMonth(), day));
+                const dOrders = state.orders.filter(o => {
+                  const oDate = new Date(o.created_at);
+                  const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
+                  return oIST.toISOString().startsWith(dStr);
+                });
+                return dOrders.length;
+              }), backgroundColor: '#fbbf24' },
+            { label: 'Delivered', data: Array.from({length: mEnd.getDate()}, (_, i) => {
+                const day = i + 1;
+                const dStr = toDateStr(new Date(mStart.getFullYear(), mStart.getMonth(), day));
+                const dOrders = state.orders.filter(o => {
+                  const oDate = new Date(o.created_at);
+                  const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
+                  return oIST.toISOString().startsWith(dStr);
+                });
+                const tCounts = categorizeOrders(dOrders);
+                return tCounts['Delivered'] || 0;
+              }), backgroundColor: '#34d399' }
           ]
         },
         options: {
@@ -2450,7 +2468,8 @@
         const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
         if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
       });
-      const atPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allItems);
+      const totalShopifySales = state.orders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
+      const atPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allItems, totalShopifySales);
       const atRet = getRetentionMetrics();
 
       const titleOverride = prefix === 'custom' ? 'Selected range' : 'Lifetime';
@@ -2534,6 +2553,10 @@
       }
 
       document.getElementById(`${prefix}-pl-table`).innerHTML = `
+        <tr style="background: rgba(var(--primary-glow), 0.05);">
+          <td><b>Shopify Gross Sales (All Orders)</b></td>
+          <td><b>${fmt(pl.shopifyGrossSales)}</b></td>
+        </tr>
         <tr><td>Gross Revenue (Delivered Only)</td><td>${fmt(pl.revenue)}</td></tr>
         <tr><td>− Total Product Cost (Delivered × CP)</td><td>${fmt(pl.productCost)}</td></tr>
         <tr><td>− Total Logistics Cost (Fulfilled × Ship)</td><td>${fmt(pl.shippingCost)}</td></tr>
