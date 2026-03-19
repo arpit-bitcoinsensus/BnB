@@ -1181,9 +1181,10 @@
 
       if (items && items.length > 0) {
         items.forEach(item => {
-          const pricing = state.productPricing[item.sku] || { cp: PRODUCT_COST, sp: item.price || 0, shipping: SHIPPING_COST };
-          const isDelivered = item.isDelivered; // We'll need to pass this info
-          const isFulfilled = item.isFulfilled; // and this
+          const lookupKey = item.sku || ('TITLE:' + item.title);
+          const pricing = state.productPricing[lookupKey] || { cp: PRODUCT_COST, sp: item.price || 0, shipping: SHIPPING_COST };
+          const isDelivered = item.isDelivered; 
+          const isFulfilled = item.isFulfilled; 
           
           if (isDelivered) {
             totalRevenue += (pricing.sp * item.quantity);
@@ -1672,7 +1673,10 @@
       state.orders.forEach(o => {
         const isDel = (o.tags || '').toLowerCase().includes('delivered');
         const isFul = (o.fulfillment_status === 'fulfilled' || isDel);
-        if (o.line_items) o.line_items.forEach(li => allViewItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
+        if (o.line_items) o.line_items.forEach(li => {
+          const lookupKey = li.sku || ('TITLE:' + li.title);
+          allViewItems.push({...li, sku: lookupKey, isDelivered: isDel, isFulfilled: isFul});
+        });
       });
 
       const mainPL = calcPL(totalRev, totalDelivered, totalAd, 0, allViewItems);
@@ -1727,7 +1731,7 @@
         row.innerHTML = `
           <td data-label="Product">
             <div style="font-weight:600; color:white;">${p.title || 'Unknown Product'}</div>
-            <div style="font-size:11px; color:var(--text-muted);">${sku}</div>
+            <div style="font-size:11px; color:var(--text-muted);">${sku.startsWith('TITLE:') ? '(No SKU)' : sku}</div>
           </td>
           <td data-label="Cost Price (CP)"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="cp" value="${p.cp}" style="width:120px;"></td>
           <td data-label="Selling Price (SP)"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="sp" value="${p.sp}" style="width:120px;"></td>
@@ -1805,9 +1809,11 @@
         const mergeList = [...(invData || []), ...(orderItemsData || [])];
 
         mergeList.forEach(item => {
-          if (!item.sku) return;
-          if (!state.productPricing[item.sku]) {
-            state.productPricing[item.sku] = {
+          const lookupKey = item.sku || ('TITLE:' + item.title);
+          if (!lookupKey) return;
+          
+          if (!state.productPricing[lookupKey]) {
+            state.productPricing[lookupKey] = {
               cp: 555,
               sp: 0,
               shipping: 135,
@@ -1815,8 +1821,8 @@
             };
           } else {
             // Keep existing pricing but update title if it was unknown
-            if (!state.productPricing[item.sku].title || state.productPricing[item.sku].title === 'Unknown Product') {
-              state.productPricing[item.sku].title = item.title;
+            if (!state.productPricing[lookupKey].title || state.productPricing[lookupKey].title === 'Unknown Product') {
+              state.productPricing[lookupKey].title = item.title;
             }
           }
         });
@@ -2056,7 +2062,8 @@
           const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
           if (o.line_items) {
             o.line_items.forEach(li => {
-              allDayItems.push({ ...li, isDelivered: isDel, isFulfilled: isFul });
+              const lookupKey = li.sku || ('TITLE:' + li.title);
+              allDayItems.push({ ...li, sku: lookupKey, isDelivered: isDel, isFulfilled: isFul });
             });
           }
         });
@@ -2200,7 +2207,10 @@
         dOrders.forEach(o => {
           const isDel = categorizeOrders([o])['Delivered'] > 0;
           const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
-          if (o.line_items) o.line_items.forEach(li => dItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
+          if (o.line_items) o.line_items.forEach(li => {
+            const lookupKey = li.sku || ('TITLE:' + li.title);
+            dItems.push({...li, sku: lookupKey, isDelivered: isDel, isFulfilled: isFul});
+          });
         });
         const dPL = calcPL(dRev, dDel, dAd, dFul, dItems);
 
