@@ -934,7 +934,8 @@
           });
         });
 
-        const pl = calcPL(metrics.rev, metrics.delivered, metrics.ad, metrics.delivered, allItems);
+        const totalShopifySales = state.orders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
+        const pl = calcPL(metrics.rev, metrics.delivered, metrics.ad, metrics.delivered, allItems, totalShopifySales);
         metrics.netProfit = pl.profit;
         metrics.productCost = pl.productCost;
         metrics.logisticsCost = pl.shippingCost;
@@ -1206,10 +1207,11 @@
         .reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
     }
 
-    function calcPL(revenue, deliveredCount, adCost, fulfilledCount = 0, items = []) {
+    function calcPL(revenue, deliveredCount, adCost, fulfilledCount = 0, items = [], totalShopifyRevenue = 0) {
       let totalProductCost = 0;
       let totalLogisticsCost = 0;
       let totalRevenue = 0;
+      let shopifyGrossSales = totalShopifyRevenue || 0;
 
       if (items && items.length > 0) {
         items.forEach(item => {
