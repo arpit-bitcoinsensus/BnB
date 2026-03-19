@@ -1794,10 +1794,17 @@
       if (!sbClient) return;
       showLoading('Syncing SKUs from Inventory table...');
       try {
-        const { data, error } = await sbClient.from('inventory').select('sku, title');
-        if (error) throw error;
+        // 1. Fetch from inventory table
+        const { data: invData, error: invError } = await sbClient.from('inventory').select('sku, title');
+        if (invError) throw invError;
 
-        data.forEach(item => {
+        // 2. Fetch unique SKUs from order_items table for products that might not be in inventory
+        const { data: orderItemsData, error: oiError } = await sbClient.from('order_items').select('sku, title');
+        if (oiError) throw oiError;
+
+        const mergeList = [...(invData || []), ...(orderItemsData || [])];
+
+        mergeList.forEach(item => {
           if (!item.sku) return;
           if (!state.productPricing[item.sku]) {
             state.productPricing[item.sku] = {
@@ -1807,11 +1814,15 @@
               title: item.title
             };
           } else {
-            state.productPricing[item.sku].title = item.title;
+            // Keep existing pricing but update title if it was unknown
+            if (!state.productPricing[item.sku].title || state.productPricing[item.sku].title === 'Unknown Product') {
+              state.productPricing[item.sku].title = item.title;
+            }
           }
         });
+
         renderPricing();
-        log(`Synced ${data.length} SKUs from inventory.`);
+        log(`Synced ${Object.keys(state.productPricing).length} total SKUs from inventory and orders.`);
       } catch (e) {
         log("Sync pricing error: " + e.message);
       } finally {
