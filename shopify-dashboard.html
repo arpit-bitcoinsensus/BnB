@@ -141,6 +141,20 @@
     .order-tags { display: flex; flex-wrap: wrap; gap: 6px; }
     .order-tag { font-size: 11px; font-weight: 500; padding: 4px 8px; background: rgba(0,0,0,0.3); border-radius: 6px; border: 1px solid var(--border); }
 
+    .sheet-container div[style*="overflow-x: auto"] { 
+      scrollbar-width: thin; 
+      background: 
+        linear-gradient(to right, var(--bg-color) 30%, rgba(5,5,5,0)),
+        linear-gradient(to right, rgba(5,5,5,0), var(--bg-color) 70%) 0 100%,
+        radial-gradient(farthest-side at 0% 50%, rgba(255,255,255,0.1), rgba(0,0,0,0)),
+        radial-gradient(farthest-side at 100% 50%, rgba(255,255,255,0.1), rgba(0,0,0,0)) 0 100%;
+      background-repeat: no-repeat;
+      background-color: var(--bg-color);
+      background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+      background-position: 0 0, 100% 0, 0 0, 100% 0;
+      background-attachment: local, local, scroll, scroll;
+    }
+
     /* Scrollable Daily Feed */
     .daily-feed-container { display: flex; flex-direction: column; gap: 32px; }
     .day-block { border-radius: 16px; padding: 24px; }
@@ -204,6 +218,61 @@
     
     #btn-intel-toggle { background: linear-gradient(135deg, #8b5cf6, #3b82f6); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform 0.2s; }
     #btn-intel-toggle:hover { transform: scale(1.05); }
+
+    /* MOBILE OPTIMIZATION */
+    @media (max-width: 768px) {
+      .container { padding: 16px; }
+      
+      header { flex-direction: column; align-items: stretch; text-align: center; gap: 20px; }
+      .header-controls { justify-content: center; flex-wrap: wrap; gap: 10px; }
+      h1 { font-size: 24px; }
+
+      .tabs { 
+        overflow-x: auto; 
+        white-space: nowrap; 
+        -webkit-overflow-scrolling: touch; 
+        padding-bottom: 4px; 
+        margin-bottom: 24px;
+        scrollbar-width: none; /* Hide scrollbar Firefox */
+      }
+      .tabs::-webkit-scrollbar { display: none; } /* Hide scrollbar Chrome/Safari */
+      .tab { padding: 10px 16px; flex-shrink: 0; font-size: 14px; }
+
+      .controls-bar { flex-direction: column; align-items: stretch; gap: 12px; padding: 12px; }
+      .date-picker { flex-wrap: wrap; justify-content: center; gap: 8px; }
+      .date-picker input { flex: 1; min-width: 120px; font-size: 14px; }
+      
+      .metrics-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      .metric-card { padding: 16px; }
+      .metric-value { font-size: 20px; }
+      
+      .main-grid { grid-template-columns: 1fr; gap: 16px; }
+      .card { padding: 16px; }
+      
+      .tags-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      
+      /* Table scroll indicators */
+      .sheet-container { border-radius: 8px; }
+      .sheet-table th, .sheet-table td { padding: 10px 12px; font-size: 12px; }
+      
+      .intel-drawer { width: 100%; right: -100%; }
+      .intel-drawer.active { right: 0; }
+      
+      .pricing-input { width: 100% !important; margin-bottom: 8px; text-align: left; }
+      #view-pricing .sheet-table td { display: flex; flex-direction: column; padding: 16px 12px; }
+      #view-pricing .sheet-table th { display: none; }
+      #view-pricing .sheet-table tr { display: block; border-bottom: 2px solid var(--border); margin-bottom: 16px; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 12px; }
+      #view-pricing .sheet-table td:before { content: attr(data-label); font-size: 10px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; }
+
+      .mini-dashboard { grid-template-columns: 1fr; padding: 16px; }
+      .sheet-summary-bar { flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px; }
+    }
+
+    @media (max-width: 480px) {
+      .metrics-grid { grid-template-columns: 1fr; }
+      .tags-grid { grid-template-columns: 1fr; }
+      .header-controls button { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -230,6 +299,7 @@
       <div class="tab" data-target="daily">Daily</div>
       <div class="tab active" data-target="sheet">Sheet View</div>
       <div class="tab" data-target="products">Products</div>
+      <div class="tab" data-target="pricing">Pricing</div>
       <div class="tab" data-target="weekly">Weekly</div>
       <div class="tab" data-target="monthly">Monthly</div>
       <div class="tab" data-target="all-time">All Time</div>
@@ -317,6 +387,36 @@
               </tr>
             </thead>
             <tbody id="products-tbody">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRICING MANAGEMENT VIEW -->
+    <div id="view-pricing" class="view-content">
+      <div class="controls-bar">
+        <h2 style="margin:0; font-size:18px;">Product Pricing Management</h2>
+        <div style="margin-left:auto; display:flex; gap:12px;">
+          <button id="btn-sync-pricing" style="font-size:13px;">Sync SKUs from Inventory</button>
+          <button class="primary" id="btn-save-pricing">Save All Changes</button>
+        </div>
+      </div>
+      
+      <div class="sheet-container">
+        <div style="overflow-x: auto;">
+          <table class="sheet-table">
+            <thead>
+              <tr>
+                <th>Product / SKU</th>
+                <th style="width: 150px;">Cost Price (CP)</th>
+                <th style="width: 150px;">Selling Price (SP)</th>
+                <th style="width: 180px;">Shipping/Fulfillment</th>
+                <th style="width: 100px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="pricing-tbody">
               <!-- Rendered by JS -->
             </tbody>
           </table>
@@ -566,6 +666,7 @@
       adCosts: {},
       charts: {},
       expandedOrders: new Set(),
+      productPricing: {}, // Map: sku -> { cp, sp, shipping, title }
       sheetFilters: {
         search: '',
         status: 'all',
@@ -697,6 +798,7 @@
         return; // Halt if we can't get config
       }
       setupViewInputs();
+      await fetchPricing(); // Load pricing first
       fetchCurrentView();
     }
 
@@ -868,6 +970,8 @@
         document.getElementById('intel-drawer').classList.remove('active');
       });
       document.getElementById('btn-ai-deep')?.addEventListener('click', fetchDeepAI);
+      document.getElementById('btn-save-pricing')?.addEventListener('click', savePricing);
+      document.getElementById('btn-sync-pricing')?.addEventListener('click', syncPricingFromInventory);
     });
     function getWeekStart(d) {
       const day = d.getDay();
@@ -956,6 +1060,7 @@
         e.target.classList.add('active');
         state.view = e.target.dataset.target;
         document.getElementById(`view-${state.view}`).classList.add('active');
+        if (state.view === 'pricing') fetchPricing();
         // Initial setup for view if needed
         setupViewInputs();
         fetchCurrentView();
@@ -1067,14 +1172,45 @@
         .reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
     }
 
-    function calcPL(revenue, deliveredCount, adCost, fulfilledCount = 0) {
-      // Use fulfilledCount for costs if provided, otherwise fallback to deliveredCount
-      const costCount = fulfilledCount || deliveredCount;
-      const productCost = costCount * PRODUCT_COST;
-      const shippingCost = costCount * SHIPPING_COST;
-      const totalCost = productCost + shippingCost + adCost;
-      const profit = revenue - totalCost;
-      return { revenue, productCost, shippingCost, adCost, totalCost, profit, deliveredCount, fulfilledCount: costCount };
+    function calcPL(revenue, deliveredCount, adCost, fulfilledCount = 0, items = []) {
+      let totalProductCost = 0;
+      let totalLogisticsCost = 0;
+      let totalRevenue = 0;
+
+      if (items && items.length > 0) {
+        items.forEach(item => {
+          const pricing = state.productPricing[item.sku] || { cp: PRODUCT_COST, sp: item.price || 0, shipping: SHIPPING_COST };
+          const isDelivered = item.isDelivered; // We'll need to pass this info
+          const isFulfilled = item.isFulfilled; // and this
+          
+          if (isDelivered) {
+            totalRevenue += (pricing.sp * item.quantity);
+            totalProductCost += (pricing.cp * item.quantity);
+          }
+          if (isFulfilled) {
+            totalLogisticsCost += (pricing.shipping * item.quantity);
+          }
+        });
+      } else {
+        // Fallback to old logic if no items provided (legacy/compat)
+        totalProductCost = (deliveredCount || 0) * PRODUCT_COST;
+        totalLogisticsCost = (fulfilledCount || deliveredCount || 0) * SHIPPING_COST;
+        totalRevenue = revenue;
+      }
+
+      const totalCost = totalProductCost + totalLogisticsCost + adCost;
+      const profit = totalRevenue - totalCost;
+      
+      return { 
+        revenue: totalRevenue, 
+        productCost: totalProductCost, 
+        shippingCost: totalLogisticsCost, 
+        adCost, 
+        totalCost, 
+        profit, 
+        deliveredCount, 
+        fulfilledCount: fulfilledCount || deliveredCount 
+      };
     }
 
     // Fetch API
@@ -1248,7 +1384,7 @@
     async function fetchOrdersFromSupabase(minDate, maxDate) {
       const { data, error } = await sbClient
         .from('orders')
-        .select('*')
+        .select('*, order_items(*)')
         .gte('created_at', minDate)
         .lte('created_at', maxDate)
         .order('created_at', { ascending: false });
@@ -1264,7 +1400,8 @@
         tags: o.tags,
         fulfillment_status: o.fulfillment_status,
         financial_status: o.financial_status,
-        customer: { first_name: o.customer_fn, last_name: o.customer_ln }
+        customer: { first_name: o.customer_fn, last_name: o.customer_ln },
+        line_items: o.order_items || []
       }));
     }
 
@@ -1454,6 +1591,7 @@
         const isExpanded = state.expandedOrders.has(o.id);
         const tCounts = categorizeOrders([o]);
         const isDelivered = tCounts['Delivered'] > 0;
+        const isFulfilled = tCounts['Fulfilled'] > 0 || isDelivered;
         const rev = isDelivered ? parseFloat(o.total_price || 0) : 0;
         totalRev += rev;
         if (isDelivered) totalDelivered++;
@@ -1478,7 +1616,21 @@
         if (isExpanded) {
           const detailRow = document.createElement('tr');
           detailRow.className = 'expanded-details';
-          const pl = calcPL(rev, isDelivered ? 1 : 0, 0); // Mini PL for one order
+          
+          // Use productPricing if available for items
+          let pl;
+          if (o.line_items && o.line_items.length > 0) {
+             const items = o.line_items.map(li => ({
+               sku: li.sku,
+               quantity: li.quantity,
+               price: li.price,
+               isDelivered,
+               isFulfilled
+             }));
+             pl = calcPL(rev, isDelivered ? 1 : 0, 0, isFulfilled ? 1 : 0, items);
+          } else {
+             pl = calcPL(rev, isDelivered ? 1 : 0, 0, isFulfilled ? 1 : 0);
+          }
           detailRow.innerHTML = `
             <td colspan="6">
               <div class="mini-dashboard">
@@ -1507,13 +1659,156 @@
 
       // Sum ad costs for the range
       totalAd = Object.values(state.adCosts).reduce((a, b) => a + b, 0);
-      const mainPL = calcPL(totalRev, totalDelivered, totalAd);
+
+      const allViewItems = [];
+      state.orders.forEach(o => {
+        const isDel = (o.tags || '').toLowerCase().includes('delivered');
+        const isFul = (o.fulfillment_status === 'fulfilled' || isDel);
+        if (o.line_items) o.line_items.forEach(li => allViewItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
+      });
+
+      const mainPL = calcPL(totalRev, totalDelivered, totalAd, 0, allViewItems);
 
       summary.innerHTML = `
         <div class="summary-item"><span class="summary-label">Total Revenue:</span><span>${fmt(totalRev)}</span></div>
         <div class="summary-item"><span class="summary-label">Ad Spend:</span><span class="text-loss">${fmt(totalAd)}</span></div>
         <div class="summary-item"><span class="summary-label">Net P&L:</span><span class="${mainPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmt(mainPL.profit)}</span></div>
       `;
+    }
+
+    // PRICING MANAGEMENT LOGIC
+    async function fetchPricing() {
+      if (!sbClient) return;
+      showLoading('Loading product pricing...');
+      try {
+        const { data, error } = await sbClient.from('product_pricing').select('*');
+        if (error) throw error;
+        
+        state.productPricing = {};
+        data.forEach(p => {
+          state.productPricing[p.sku] = {
+            cp: p.cost_price,
+            sp: p.selling_price,
+            shipping: p.shipping_charge,
+            title: p.product_title
+          };
+        });
+        renderPricing();
+      } catch (e) {
+        log("Error fetching pricing: " + e.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function renderPricing() {
+      const tbody = document.getElementById('pricing-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      const skus = Object.keys(state.productPricing).sort();
+      
+      if (skus.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted)">No products found. Sync from inventory to begin.</td></tr>';
+        return;
+      }
+
+      skus.forEach(sku => {
+        const p = state.productPricing[sku];
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td data-label="Product">
+            <div style="font-weight:600; color:white;">${p.title || 'Unknown Product'}</div>
+            <div style="font-size:11px; color:var(--text-muted);">${sku}</div>
+          </td>
+          <td data-label="Cost Price (CP)"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="cp" value="${p.cp}" style="width:120px;"></td>
+          <td data-label="Selling Price (SP)"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="sp" value="${p.sp}" style="width:120px;"></td>
+          <td data-label="Shipping/Fulfillment"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="shipping" value="${p.shipping}" style="width:120px;"></td>
+          <td data-label="Action"><button class="expand-btn" onclick="saveSinglePricing('${sku}')">Save</button></td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      // Add event listeners to inputs to update state
+      document.querySelectorAll('.pricing-input').forEach(input => {
+        input.addEventListener('change', (e) => {
+          const sku = e.target.dataset.sku;
+          const field = e.target.dataset.field;
+          state.productPricing[sku][field] = parseFloat(e.target.value) || 0;
+        });
+      });
+    }
+
+    async function savePricing() {
+      if (!sbClient) return;
+      showLoading('Saving all product pricing...');
+      try {
+        const rows = Object.entries(state.productPricing).map(([sku, p]) => ({
+          sku,
+          product_title: p.title,
+          cost_price: p.cp,
+          selling_price: p.sp,
+          shipping_charge: p.shipping,
+          updated_at: new Date().toISOString()
+        }));
+
+        const { error } = await sbClient.from('product_pricing').upsert(rows);
+        if (error) throw error;
+        log("Product pricing saved successfully.");
+      } catch (e) {
+        log("Error saving pricing: " + e.message);
+        alert("Save failed: " + e.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function saveSinglePricing(sku) {
+      if (!sbClient) return;
+      const p = state.productPricing[sku];
+      try {
+        const { error } = await sbClient.from('product_pricing').upsert({
+          sku,
+          product_title: p.title,
+          cost_price: p.cp,
+          selling_price: p.sp,
+          shipping_charge: p.shipping,
+          updated_at: new Date().toISOString()
+        });
+        if (error) throw error;
+        log(`Pricing for SKU ${sku} saved.`);
+      } catch (e) {
+        log("Error saving single pricing: " + e.message);
+      }
+    }
+
+    async function syncPricingFromInventory() {
+      if (!sbClient) return;
+      showLoading('Syncing SKUs from Inventory table...');
+      try {
+        const { data, error } = await sbClient.from('inventory').select('sku, title');
+        if (error) throw error;
+
+        data.forEach(item => {
+          if (!item.sku) return;
+          if (!state.productPricing[item.sku]) {
+            state.productPricing[item.sku] = {
+              cp: 555,
+              sp: 0,
+              shipping: 135,
+              title: item.title
+            };
+          } else {
+            state.productPricing[item.sku].title = item.title;
+          }
+        });
+        renderPricing();
+        log(`Synced ${data.length} SKUs from inventory.`);
+      } catch (e) {
+        log("Sync pricing error: " + e.message);
+      } finally {
+        hideLoading();
+      }
     }
 
     async function renderStockAlerts() {
@@ -1574,11 +1869,13 @@
       const sorted = Object.entries(stats).sort((a, b) => b[1].revenue - a[1].revenue);
 
       tbody.innerHTML = sorted.map(([title, s]) => {
-        const cost = s.sold * (PRODUCT_COST + SHIPPING_COST);
+        const sku = data.find(item => item.title === title)?.sku;
+        const pricing = state.productPricing[sku] || { cp: PRODUCT_COST, shipping: SHIPPING_COST };
+        const cost = s.sold * (pricing.cp + pricing.shipping);
         const profit = s.revenue - cost;
         return `
           <tr>
-            <td>${title}</td>
+            <td>${title} <div style="font-size:10px; color:var(--text-muted)">${sku || ''}</div></td>
             <td style="font-weight:600;">${s.sold}</td>
             <td>${fmt(s.revenue)}</td>
             <td class="text-loss">${fmt(cost)}</td>
@@ -1732,7 +2029,20 @@
         const deliveredCount = tagsCounts['Delivered'] || 0;
         const fulfilledCount = tagsCounts['Fulfilled'] || 0;
         const adCost = state.adCosts[dateStr] || 0;
-        const pl = calcPL(revenue, deliveredCount, adCost, fulfilledCount);
+        
+        // Collect all items for the day to calculate accurate P&L
+        const allDayItems = [];
+        dayOrders.forEach(o => {
+          const isDel = categorizeOrders([o])['Delivered'] > 0;
+          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
+          if (o.line_items) {
+            o.line_items.forEach(li => {
+              allDayItems.push({ ...li, isDelivered: isDel, isFulfilled: isFul });
+            });
+          }
+        });
+
+        const pl = calcPL(revenue, deliveredCount, adCost, fulfilledCount, allDayItems);
 
         const prettyDate = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
@@ -1784,6 +2094,7 @@
                 <button class="inline-btn primary" id="btn-ad-${dateStr}">Save</button>
               </div>
             </div>
+            <div class="metric-card"><div class="metric-label">Net Profit</div><div class="metric-value ${pl.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(pl.profit)}</div></div>
           </div>
 
           <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;" onclick="document.getElementById('orders-${dateStr}').style.display = document.getElementById('orders-${dateStr}').style.display === 'none' ? 'block' : 'none'">
@@ -1865,7 +2176,14 @@
         const dFul = tCounts['Fulfilled'] || 0;
         const dCanc = tCounts['Canceled'] || 0;
         const dAd = state.adCosts[dStr] || 0;
-        const dPL = calcPL(dRev, dDel, dAd, dFul);
+        
+        const dItems = [];
+        dOrders.forEach(o => {
+          const isDel = categorizeOrders([o])['Delivered'] > 0;
+          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
+          if (o.line_items) o.line_items.forEach(li => dItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
+        });
+        const dPL = calcPL(dRev, dDel, dAd, dFul, dItems);
 
         totalOrders += dOrders.length;
         totalRevenue += dRev;
@@ -1883,7 +2201,13 @@
         });
       }
 
-      const wPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled);
+      const allItems = [];
+      state.orders.forEach(o => {
+        const isDel = categorizeOrders([o])['Delivered'] > 0;
+        const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
+        if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
+      });
+      const wPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allItems);
       const wRet = getRetentionMetrics();
 
       document.getElementById('weekly-metrics').innerHTML = `
@@ -1971,7 +2295,13 @@
         });
       }
 
-      const mPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled);
+      const allItems = [];
+      state.orders.forEach(o => {
+        const isDel = categorizeOrders([o])['Delivered'] > 0;
+        const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
+        if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
+      });
+      const mPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allItems);
       const mRet = getRetentionMetrics();
 
       document.getElementById('monthly-metrics').innerHTML = `
@@ -2050,7 +2380,14 @@
       let totalTransit = tCounts['In Transit'] || 0;
       
       let totalAdCost = Object.values(state.adCosts).reduce((sum, cost) => sum + cost, 0);
-      const atPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled);
+      
+      const allItems = [];
+      state.orders.forEach(o => {
+        const isDel = categorizeOrders([o])['Delivered'] > 0;
+        const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
+        if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
+      });
+      const atPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allItems);
       const atRet = getRetentionMetrics();
 
       const titleOverride = prefix === 'custom' ? 'Selected range' : 'Lifetime';
@@ -2134,13 +2471,13 @@
       }
 
       document.getElementById(`${prefix}-pl-table`).innerHTML = `
-        <tr><td>Revenue (delivered orders)</td><td>${fmt(pl.revenue)}</td></tr>
-        <tr><td>− Product cost (${deliveredCount} units × ₹${PRODUCT_COST})</td><td>${fmt(pl.productCost)}</td></tr>
-        <tr><td>− Shipping cost (${deliveredCount} units × ₹${SHIPPING_COST})</td><td>${fmt(pl.shippingCost)}</td></tr>
-        <tr><td>− Advertising spend (Sum)</td><td>${fmt(pl.adCost)}</td></tr>
-        <tr><td>Total costs</td><td>${fmt(pl.totalCost)}</td></tr>
+        <tr><td>Gross Revenue (Delivered Only)</td><td>${fmt(pl.revenue)}</td></tr>
+        <tr><td>− Total Product Cost (Delivered × CP)</td><td>${fmt(pl.productCost)}</td></tr>
+        <tr><td>− Total Logistics Cost (Fulfilled × Ship)</td><td>${fmt(pl.shippingCost)}</td></tr>
+        <tr><td>− Advertising Spend</td><td>${fmt(pl.adCost)}</td></tr>
+        <tr style="border-top: 1px solid #333;"><td>Total Expenses</td><td>${fmt(pl.totalCost)}</td></tr>
         <tr class="total-row">
-          <td>Net ${pText}</td>
+          <td>Estimated Net ${pText}</td>
           <td class="${pl.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmt(Math.abs(pl.profit))} ${pl.profit >= 0 ? '▲' : '▼'}</td>
         </tr>
       `;
