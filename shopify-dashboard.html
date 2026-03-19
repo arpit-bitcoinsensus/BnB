@@ -706,9 +706,9 @@
 
 
     function toDateStr(d) {
-      return d.getFullYear() + '-' +
-        String(d.getMonth() + 1).padStart(2, '0') + '-' +
-        String(d.getDate()).padStart(2, '0');
+      // Return IST date string (YYYY-MM-DD)
+      const istDate = new Date(d.getTime() + (5.5 * 60 * 60 * 1000));
+      return istDate.toISOString().substring(0, 10);
     }
 
     // AUTHENTICATION
@@ -1041,12 +1041,10 @@
           if (tags.includes(st.toLowerCase())) { counts[st]++; matched = true; }
         });
 
-        // If no tag matched, fall back to Shopify fulfillment/financial status
+        // Fallback: Shopify fulfillment/financial status
         if (!matched) {
-          if (fs === 'fulfilled') {
-            counts['Delivered']++; matched = true;
-          } else if (fs === 'partial') {
-            counts['In Transit']++; matched = true;
+          if (fs === 'fulfilled' || fs === 'partial') {
+            counts['Fulfilled']++; matched = true;
           } else if (fin === 'voided' || fin === 'refunded' ||
                      tags.some(t => t === 'cancelled' || t === 'canceled')) {
             counts['Canceled']++; matched = true;
@@ -1064,18 +1062,19 @@
       return orders
         .filter(o => {
           const tags = (o.tags || '').toLowerCase().split(',').map(t => t.trim());
-          const fs = (o.fulfillment_status || '').toLowerCase();
-          return tags.includes('delivered') || fs === 'fulfilled';
+          return tags.includes('delivered');
         })
         .reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
     }
 
-    function calcPL(revenue, deliveredCount, adCost) {
-      const productCost = deliveredCount * PRODUCT_COST;
-      const shippingCost = deliveredCount * SHIPPING_COST;
+    function calcPL(revenue, deliveredCount, adCost, fulfilledCount = 0) {
+      // Use fulfilledCount for costs if provided, otherwise fallback to deliveredCount
+      const costCount = fulfilledCount || deliveredCount;
+      const productCost = costCount * PRODUCT_COST;
+      const shippingCost = costCount * SHIPPING_COST;
       const totalCost = productCost + shippingCost + adCost;
       const profit = revenue - totalCost;
-      return { revenue, productCost, shippingCost, adCost, totalCost, profit, deliveredCount };
+      return { revenue, productCost, shippingCost, adCost, totalCost, profit, deliveredCount, fulfilledCount: costCount };
     }
 
     // Fetch API
@@ -1723,12 +1722,17 @@
 
       for (var d = new Date(dEnd); d >= dStart; d.setDate(d.getDate() - 1)) {
         const dateStr = toDateStr(d);
-        const dayOrders = state.orders.filter(o => o.created_at && o.created_at.startsWith(dateStr));
+        const dayOrders = state.orders.filter(o => {
+          const oDate = new Date(o.created_at);
+          const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
+          return oIST.toISOString().startsWith(dateStr);
+        });
         const tagsCounts = categorizeOrders(dayOrders);
         const revenue = getTotalRevenue(dayOrders);
         const deliveredCount = tagsCounts['Delivered'] || 0;
+        const fulfilledCount = tagsCounts['Fulfilled'] || 0;
         const adCost = state.adCosts[dateStr] || 0;
-        const pl = calcPL(revenue, deliveredCount, adCost);
+        const pl = calcPL(revenue, deliveredCount, adCost, fulfilledCount);
 
         const prettyDate = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
@@ -1770,6 +1774,7 @@
 
           <div class="metrics-grid" style="margin-bottom: 24px;">
             <div class="metric-card"><div class="metric-label">Orders</div><div class="metric-value">${dayOrders.length}</div></div>
+            <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--primary)">${fulfilledCount}</div></div>
             <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${deliveredCount}</div></div>
             <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
             <div class="metric-card">
@@ -1842,23 +1847,30 @@
       let totalOrders = 0;
       let totalRevenue = 0;
       let totalDelivered = 0;
+      let totalFulfilled = 0;
       let totalAdCost = 0;
       
       let daysData = [];
 
       for (var d = new Date(wStart); d <= wEnd; d.setDate(d.getDate() + 1)) {
         const dStr = toDateStr(d);
-        const dOrders = state.orders.filter(o => o.created_at && o.created_at.startsWith(dStr));
+        const dOrders = state.orders.filter(o => {
+          const oDate = new Date(o.created_at);
+          const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
+          return oIST.toISOString().startsWith(dStr);
+        });
         const tCounts = categorizeOrders(dOrders);
         const dRev = getTotalRevenue(dOrders);
         const dDel = tCounts['Delivered'] || 0;
+        const dFul = tCounts['Fulfilled'] || 0;
         const dCanc = tCounts['Canceled'] || 0;
         const dAd = state.adCosts[dStr] || 0;
-        const dPL = calcPL(dRev, dDel, dAd);
+        const dPL = calcPL(dRev, dDel, dAd, dFul);
 
         totalOrders += dOrders.length;
         totalRevenue += dRev;
         totalDelivered += dDel;
+        totalFulfilled += dFul;
         totalAdCost += dAd;
 
         daysData.push({
@@ -1871,11 +1883,12 @@
         });
       }
 
-      const wPL = calcPL(totalRevenue, totalDelivered, totalAdCost);
+      const wPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled);
       const wRet = getRetentionMetrics();
 
       document.getElementById('weekly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
+        <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--primary)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${wRet.repeatRate}%</div></div>
         <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
@@ -1923,6 +1936,7 @@
       let totalOrders = 0;
       let totalRevenue = 0;
       let totalDelivered = 0;
+      let totalFulfilled = 0;
       let totalCanceled = 0;
       let totalTransit = 0;
       let totalAdCost = 0;
@@ -1931,15 +1945,21 @@
 
       for (var d = new Date(mStart); d <= mEnd; d.setDate(d.getDate() + 1)) {
         const dStr = toDateStr(d);
-        const dOrders = state.orders.filter(o => o.created_at && o.created_at.startsWith(dStr));
+        const dOrders = state.orders.filter(o => {
+          const oDate = new Date(o.created_at);
+          const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
+          return oIST.toISOString().startsWith(dStr);
+        });
         const tCounts = categorizeOrders(dOrders);
         const dRev = getTotalRevenue(dOrders);
         const dDel = tCounts['Delivered'] || 0;
+        const dFul = tCounts['Fulfilled'] || 0;
         const dAd = state.adCosts[dStr] || 0;
 
         totalOrders += dOrders.length;
         totalRevenue += dRev;
         totalDelivered += dDel;
+        totalFulfilled += dFul;
         totalCanceled += tCounts['Canceled'] || 0;
         totalTransit += tCounts['In Transit'] || 0;
         totalAdCost += dAd;
@@ -1951,11 +1971,12 @@
         });
       }
 
-      const mPL = calcPL(totalRevenue, totalDelivered, totalAdCost);
+      const mPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled);
       const mRet = getRetentionMetrics();
 
       document.getElementById('monthly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
+        <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--primary)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${mRet.repeatRate}%</div></div>
         <div class="metric-card"><div class="metric-label">In Transit</div><div class="metric-value" style="color:var(--primary)">${totalTransit}</div></div>
@@ -2024,17 +2045,19 @@
       let totalRevenue = getTotalRevenue(state.orders);
       let tCounts = categorizeOrders(state.orders);
       let totalDelivered = tCounts['Delivered'] || 0;
+      let totalFulfilled = tCounts['Fulfilled'] || 0;
       let totalCanceled = tCounts['Canceled'] || 0;
       let totalTransit = tCounts['In Transit'] || 0;
       
       let totalAdCost = Object.values(state.adCosts).reduce((sum, cost) => sum + cost, 0);
-      const atPL = calcPL(totalRevenue, totalDelivered, totalAdCost);
+      const atPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled);
       const atRet = getRetentionMetrics();
 
       const titleOverride = prefix === 'custom' ? 'Selected range' : 'Lifetime';
 
       document.getElementById(`${prefix}-metrics`).innerHTML = `
         <div class="metric-card"><div class="metric-label">${titleOverride} Orders</div><div class="metric-value">${totalOrders}</div></div>
+        <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--primary)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${atRet.repeatRate}%</div></div>
         <div class="metric-card"><div class="metric-label">${titleOverride} Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
@@ -2056,8 +2079,9 @@
       // Group by YY-MM for breakdown
       const monthGroups = {};
       state.orders.forEach(o => {
-        const d = new Date(o.created_at);
-        const yymm = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        const oDate = new Date(o.created_at);
+        const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
+        const yymm = `${oIST.getFullYear()}-${String(oIST.getMonth()+1).padStart(2,'0')}`;
         if(!monthGroups[yymm]) monthGroups[yymm] = [];
         monthGroups[yymm].push(o);
       });
