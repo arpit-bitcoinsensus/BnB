@@ -1060,10 +1060,12 @@
         e.target.classList.add('active');
         state.view = e.target.dataset.target;
         document.getElementById(`view-${state.view}`).classList.add('active');
-        if (state.view === 'pricing') fetchPricing();
-        // Initial setup for view if needed
-        setupViewInputs();
-        fetchCurrentView();
+        if (state.view === 'pricing') {
+          fetchPricing();
+        } else {
+          setupViewInputs();
+          fetchCurrentView();
+        }
       });
     });
 
@@ -1467,6 +1469,12 @@
             dbMax = toDateStr(new Date());
           }
         }
+
+        if (!dbMin || !dbMax) {
+          console.warn("No date range for view:", state.view);
+          return;
+        }
+
         // Use full ISO timestamps to ensure entire days (including today) are covered
         minDate = new Date(dbMin + 'T00:00:00Z').toISOString();
         maxDate = new Date(dbMax + 'T23:59:59Z').toISOString();
