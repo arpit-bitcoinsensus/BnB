@@ -25,20 +25,29 @@ app.post('/api/ai-insights', async (req, res) => {
 
     const prompt = `
       You are a world-class E-commerce Business Analyst for "BnB Toys".
-      Analyze these store metrics for the period: ${period}
+      Analyze these store metrics and product performance for the period: ${period}
       
-      METRICS:
-      - Total Revenue: ₹${metrics.rev}
-      - Total Orders: ${metrics.orders}
-      - Delivered Orders: ${metrics.delivered}
-      - Ad Spend: ₹${metrics.ad}
-      - Repeat Customer Rate: ${metrics.retention}%
+      FINANCIAL METRICS:
+      - Gross Revenue (Delivered): ₹${metrics.rev}
+      - Total Orders: ${metrics.orders} (Delivered: ${metrics.delivered})
+      - Advertising Spend: ₹${metrics.ad}
+      - Total Product Cost (CP): ₹${metrics.productCost}
+      - Total Logistics/Shipping Cost: ₹${metrics.logisticsCost}
+      - ESTIMATED NET PROFIT: ₹${metrics.netProfit}
+      - Customer Retention Rate: ${metrics.retention}%
+      
+      TOP PRODUCTS PERFORMANCE:
+      ${metrics.topProducts.map(p => `- ${p.title}: Sold ${p.sold}, Revenue ₹${p.rev}`).join('\n')}
       
       TASK:
-      Provide a highly strategic analysis.
-      1. Give a 1-sentence executive summary of store health.
-      2. Provide 3 specific "Do's" (Strategic actions to scale or improve).
-      3. Provide 3 specific "Don'ts" (Risks or inefficient behaviors to stop).
+      Provide a highly strategic, data-driven analysis.
+      1. Give a 1-sentence executive summary focused on profitability and efficiency.
+      2. Provide 3 specific "Strategic Do's" (Focus on scaling winners, improving margins, or optimizing ad spend).
+      3. Provide 3 specific "Strategic Don'ts" (Address high costs, low margins, or retention gaps).
+      
+      SPECIAL FOCUS: 
+      - If Net Profit is low relative to Revenue, analyze why (Logistics? Product Cost? Ad Spend?).
+      - Provide advice for specific products listed in the performance section.
       
       FORMAT: Return JSON exactly like this:
       {

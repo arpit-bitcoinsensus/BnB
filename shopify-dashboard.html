@@ -909,16 +909,47 @@
           orders: 0,
           delivered: 0,
           ad: Object.values(state.adCosts).reduce((a,b) => a+b, 0),
-          retention: getRetentionMetrics().repeatRate
+          retention: getRetentionMetrics().repeatRate,
+          netProfit: 0,
+          productCost: 0,
+          logisticsCost: 0,
+          topProducts: []
         };
 
+        const allItems = [];
         state.orders.forEach(o => {
           metrics.orders++;
-          if((o.tags || '').toLowerCase().includes('delivered')) {
+          const tCounts = categorizeOrders([o]);
+          const isDel = tCounts['Delivered'] > 0;
+          const isFul = tCounts['Fulfilled'] > 0 || isDel;
+          
+          if (isDel) {
             metrics.delivered++;
             metrics.rev += parseFloat(o.total_price || 0);
           }
+          
+          if (o.line_items) o.line_items.forEach(li => {
+            const lookupKey = li.sku || ('TITLE:' + li.title);
+            allItems.push({...li, sku: lookupKey, isDelivered: isDel, isFulfilled: isFul});
+          });
         });
+
+        const pl = calcPL(metrics.rev, metrics.delivered, metrics.ad, metrics.delivered, allItems);
+        metrics.netProfit = pl.profit;
+        metrics.productCost = pl.productCost;
+        metrics.logisticsCost = pl.shippingCost;
+
+        // Top 5 Products by Revenue
+        const prodMap = {};
+        allItems.forEach(item => {
+          if (!prodMap[item.title]) prodMap[item.title] = { sold: 0, rev: 0 };
+          prodMap[item.title].sold += item.quantity;
+          if (item.isDelivered) prodMap[item.title].rev += (item.price * item.quantity);
+        });
+        metrics.topProducts = Object.entries(prodMap)
+          .sort((a,b) => b[1].rev - a[1].rev)
+          .slice(0, 5)
+          .map(([title, d]) => ({ title, sold: d.sold, rev: Math.round(d.rev) }));
 
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '' || window.location.protocol === 'file:';
         const apiBase = (isLocal && window.location.port !== '3000') ? 'http://localhost:3000' : '';
