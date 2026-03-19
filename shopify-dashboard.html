@@ -1210,10 +1210,11 @@
     function calcPL(revenue, deliveredCount, adCost, fulfilledCount = 0, items = [], totalShopifyRevenue = 0) {
       let totalProductCost = 0;
       let totalLogisticsCost = 0;
-      let totalRevenue = 0;
-      let shopifyGrossSales = totalShopifyRevenue || 0;
+      let totalRevenue = revenue || 0; // Always trust the passed revenue as ground truth
+      let shopifyGrossSales = totalShopifyRevenue || revenue || 0;
 
       if (items && items.length > 0) {
+        // Use items mainly for granular cost attribution
         items.forEach(item => {
           const lookupKey = item.sku || ('TITLE:' + item.title);
           const pricing = state.productPricing[lookupKey] || { cp: PRODUCT_COST, sp: item.price || 0, shipping: SHIPPING_COST };
@@ -1221,19 +1222,26 @@
           const isFulfilled = item.isFulfilled; 
           
           if (isDelivered) {
-            totalRevenue += (pricing.sp * item.quantity);
-            totalProductCost += (pricing.cp * item.quantity);
+             // We use the CP from Pricing Table, but we trust the 'revenue' argument for incoming money
+             totalProductCost += (pricing.cp * item.quantity);
           }
           if (isFulfilled) {
             totalLogisticsCost += (pricing.shipping * item.quantity);
           }
         });
+        
+        // Safety: If for some reason productCost is 0 but we have deliveries, fallback to default
+        if (totalProductCost === 0 && deliveredCount > 0) {
+           totalProductCost = deliveredCount * PRODUCT_COST;
+        }
+        if (totalLogisticsCost === 0 && (fulfilledCount > 0 || deliveredCount > 0)) {
+           totalLogisticsCost = (fulfilledCount || deliveredCount) * SHIPPING_COST;
+        }
+
       } else {
         // Fallback to old logic if no items provided (legacy/compat)
         totalProductCost = (deliveredCount || 0) * PRODUCT_COST;
         totalLogisticsCost = (fulfilledCount || deliveredCount || 0) * SHIPPING_COST;
-        totalRevenue = revenue;
-        if (!shopifyGrossSales) shopifyGrossSales = revenue;
       }
 
       const totalCost = totalProductCost + totalLogisticsCost + adCost;
