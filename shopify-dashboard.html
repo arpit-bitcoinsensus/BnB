@@ -832,18 +832,18 @@
       }
       setupViewInputs();
       await fetchPricing(); // Load pricing first
-      fetchCurrentView();
+      await fetchCurrentView();
     }
 
     // Dashboard is public — start immediately
     initDashboard();
 
-
-
     function toDateStr(d) {
-      // Return IST date string (YYYY-MM-DD)
-      const istDate = new Date(d.getTime() + (5.5 * 60 * 60 * 1000));
-      return istDate.toISOString().substring(0, 10);
+      // Local date string (YYYY-MM-DD)
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
 
     // AUTHENTICATION
@@ -1068,7 +1068,7 @@
         loadingDiv.id = 'chat-loading';
         loadingDiv.textContent = 'BnB AI is typing...';
         historyContainer.appendChild(loadingDiv);
-        historyContainer.scrollTop = historyContainer.scrollHeight;
+        historyContainer.scrollTop = historyContainer.scrollTop;
 
         try {
           // Calculate context from current metrics
@@ -2618,11 +2618,35 @@
         document.getElementById('all-time-range').textContent = `From ${tMin.toLocaleDateString()} to ${tMax.toLocaleDateString()}`;
       }
 
+      function parseDate(dStr) {
+        if (!dStr) return new Date(0);
+        // Handle common formats: YYYY-MM-DD, DD/MM/YYYY, etc.
+        let d = new Date(dStr);
+        if (isNaN(d.getTime()) && dStr.includes('/')) {
+            // Try DD/MM/YYYY
+            const parts = dStr.split(' ')[0].split('/');
+            if (parts.length === 3) {
+                d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00Z`);
+            }
+        }
+        return d;
+      }
+
       // Filter orders for the CURRENT selected range
       const currentOrders = state.orders.filter(o => {
-        const d = new Date(o.created_at);
-        return d >= tMin && d <= tMax;
+        const d = parseDate(o.created_at);
+        const inRange = d >= tMin && d <= tMax;
+        return inRange;
       });
+
+      console.log(`[DEBUG] Range: ${tMin.toISOString()} to ${tMax.toISOString()}`);
+      console.log(`[DEBUG] Total in state: ${state.orders.length}`);
+      console.log(`[DEBUG] Filtered current: ${currentOrders.length}`);
+      
+      if (state.orders.length > 0 && currentOrders.length < state.orders.length) {
+         const sampleExcluded = state.orders.find(o => !(parseDate(o.created_at) >= tMin && parseDate(o.created_at) <= tMax));
+         if (sampleExcluded) console.log("[DEBUG] Sample excluded order:", sampleExcluded.name, sampleExcluded.created_at);
+      }
 
       let totalOrders = currentOrders.length;
       let totalRevenue = getTotalRevenue(currentOrders);
@@ -2695,17 +2719,17 @@
           labels.push(d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'}));
           
           currData[i] = currOrders.filter(o => {
-            const od = new Date(o.created_at);
-            const oIST = new Date(od.getTime() + (5.5 * 60 * 60 * 1000));
-            return oIST.toISOString().startsWith(dStr);
+            const od = parseDate(o.created_at);
+            const odIST = new Date(od.getTime() + (5.5 * 60 * 60 * 1000));
+            return toDateStr(odIST) === dStr;
           }).length;
 
           const pD = new Date(prevTMin.getTime() + i * 24 * 60 * 60 * 1000);
           const pDStr = toDateStr(pD);
           prevData[i] = prevOrders.filter(o => {
-            const od = new Date(o.created_at);
-            const oIST = new Date(od.getTime() + (5.5 * 60 * 60 * 1000));
-            return oIST.toISOString().startsWith(pDStr);
+            const od = parseDate(o.created_at);
+            const odIST = new Date(od.getTime() + (5.5 * 60 * 60 * 1000));
+            return toDateStr(odIST) === pDStr;
           }).length;
         }
 
