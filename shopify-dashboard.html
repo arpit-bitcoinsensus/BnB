@@ -2618,19 +2618,29 @@
           const dStr = toDateStr(d);
           labels.push(d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'}));
           
-          currData[i] = currOrders.filter(o => {
+          const dOrders = currOrders.filter(o => {
             const od = parseDate(o.created_at);
             const odIST = new Date(od.getTime() + (5.5 * 60 * 60 * 1000));
             return toDateStr(odIST) === dStr;
-          }).length;
+          });
+          currData[i] = {
+            y: dOrders.length,
+            rev: dOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0),
+            date: d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+          };
 
           const pD = new Date(prevTMin.getTime() + i * 24 * 60 * 60 * 1000);
           const pDStr = toDateStr(pD);
-          prevData[i] = prevOrders.filter(o => {
+          const pOrders = prevOrders.filter(o => {
             const od = parseDate(o.created_at);
             const odIST = new Date(od.getTime() + (5.5 * 60 * 60 * 1000));
             return toDateStr(odIST) === pDStr;
-          }).length;
+          });
+          prevData[i] = {
+            y: pOrders.length,
+            rev: pOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0),
+            date: pD.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+          };
         }
 
         if (state.charts.allTime) state.charts.allTime.destroy();
@@ -2697,11 +2707,15 @@
                 displayColors: true,
                 callbacks: {
                   title: (items) => {
-                    const idx = items[0].dataIndex;
-                    return `Orders Comparison`;
+                    return items[0].raw.date;
                   },
                   label: (item) => {
-                    return ` ${item.dataset.label}: ${item.formattedValue}`;
+                    const d = item.raw;
+                    return [
+                      ` ${item.dataset.label}`,
+                      `   Orders: ${d.y}`,
+                      `   Revenue: ₹${d.rev.toLocaleString()}`
+                    ];
                   }
                 }
               }
