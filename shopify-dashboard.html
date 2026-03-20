@@ -1230,42 +1230,41 @@
         const fs = (o.fulfillment_status || '').toLowerCase();
         const fin = (o.financial_status || '').toLowerCase();
 
-        // RTO: any tag containing 'rto' captures Shiprocket RTO tags
-        const isRTO = rawTags.some(t => t.includes('rto'));
+        // Extract synthetic shipment_status tag (stored as '__ss:<value>' during sync)
+        // Shopify shipment_status values: in_transit, out_for_delivery, delivered, failure,
+        // attempted_delivery, label_printed, label_purchased, ready_for_pickup
+        const syntheticSS = rawTags.find(t => t.startsWith('__ss:'));
+        const shipmentStatus = syntheticSS ? syntheticSS.replace('__ss:', '') : '';
 
-        // Fulfilled: order was shipped out by Shopify (fulfillment_status = fulfilled)
-        // Count ALL fulfilled orders regardless of delivery outcome
+        // --- Detect delivery state ---
+
+        // RTO: Shiprocket tag containing 'rto'
+        const isRTO = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto'));
+
+        // Fulfilled: Shopify says order has been shipped out
         const isFulfilled = (fs === 'fulfilled' || fs === 'partial');
 
-        // Delivered: fulfilled + NOT an RTO
-        // Since Shopify/Shiprocket don't always add 'delivered' tag, we infer:
-        // fulfilled & no RTO = actually delivered to customer
-        // Exception: if a 'delivered' tag explicitly exists, trust it.
-        // Exception: if a 'failed delivery' signal exists & no RTO, don't count as delivered.
-        const hasExplicitDeliveredTag = rawTags.includes('delivered');
-        // Detect Shiprocket-style delivery status tags
-        const hasFailedSignal    = rawTags.some(t => t.includes('failed delivery'));
-        const hasAttemptedSignal = rawTags.some(t => t.includes('attempted delivery'));
-        const hasOutForDelivery  = rawTags.some(t => t.includes('out for delivery'));
-        const hasInTransitTag    = rawTags.some(t => t === 'in transit' || t.includes('in transit'));
+        // Shipment status signals (from synthetic tag OR plain Shiprocket text tags)
+        const ssInTransit     = shipmentStatus === 'in_transit'    || rawTags.some(t => t.includes('in transit') && !t.startsWith('__ss:'));
+        const ssOutForDel     = shipmentStatus === 'out_for_delivery' || rawTags.some(t => t.includes('out for delivery') && !t.startsWith('__ss:'));
+        const ssFailure       = shipmentStatus === 'failure'        || shipmentStatus === 'attempted_delivery'
+                                || rawTags.some(t => (t.includes('failed delivery') || t.includes('attempted delivery')) && !t.startsWith('__ss:'));
+        const ssDelivered     = shipmentStatus === 'delivered'      || rawTags.some(t => t === 'delivered' && !t.startsWith('__ss:'));
 
-        // Delivered: fulfilled + no failure/RTO signal, or explicit 'delivered' tag
-        const isDelivered = !isRTO && isFulfilled && !hasFailedSignal && !hasAttemptedSignal
-                            && !hasOutForDelivery && !hasInTransitTag;
-        const isDeliveredByTag = hasExplicitDeliveredTag && !isRTO && !hasFailedSignal && !hasAttemptedSignal;
-        const deliveredFinal = isDelivered || isDeliveredByTag;
-
-        // In Transit (still en route, not yet out for delivery)
-        const isInTransit = hasInTransitTag && !hasOutForDelivery && !hasFailedSignal && !isRTO;
+        // In Transit: package is en route
+        const isInTransit = ssInTransit && !ssOutForDel && !ssFailure && !ssDelivered && !isRTO;
 
         // Out for Delivery
-        const isOutForDelivery = hasOutForDelivery && !hasFailedSignal && !isRTO;
+        const isOutForDelivery = ssOutForDel && !ssFailure && !ssDelivered && !isRTO;
 
         // Failed Delivery (delivery attempted but failed, not RTO)
-        const isFailedDelivery = hasFailedSignal && !isRTO;
+        const isFailedDelivery = ssFailure && !isRTO;
 
-        // Attempted Delivery (legacy tag fallback)
-        const isAttempted = hasAttemptedSignal && !isRTO && !hasFailedSignal;
+        // Delivered: explicit shipment 'delivered' OR (fulfilled + no failure/RTO/transit signals)
+        const isDelivered = !isRTO && (
+          ssDelivered || 
+          (isFulfilled && !ssInTransit && !ssOutForDel && !ssFailure)
+        );
 
         // Cancelled
         const isCanceled = rawTags.some(t => t === 'canceled' || t === 'cancelled') ||
@@ -1275,21 +1274,19 @@
         const isUnfulfilled = !isFulfilled && !isCanceled &&
                               (fs === '' || fs === 'unfulfilled' || !fs);
 
-        // Apply counts — Fulfilled is always counted for all shipped orders
+        // Apply counts
         if (isFulfilled)       counts['Fulfilled']++;
-        if (deliveredFinal)    counts['Delivered']++;
+        if (isDelivered)       counts['Delivered']++;
         if (isRTO)             counts['RTO']++;
         if (isInTransit)       counts['In Transit']++;
         if (isOutForDelivery)  counts['Out for Delivery']++;
         if (isFailedDelivery)  counts['Failed Delivery']++;
-        if (isAttempted)       counts['Attempted Delivery']++;
         if (isCanceled)        counts['Canceled']++;
         if (isUnfulfilled)     counts['Unfulfilled']++;
 
-        const anyMatched = isFulfilled || deliveredFinal || isRTO || isInTransit ||
-                           isOutForDelivery || isFailedDelivery || isAttempted ||
-                           isCanceled || isUnfulfilled;
-        if (!anyMatched) counts['Other']++
+        const anyMatched = isFulfilled || isDelivered || isRTO || isInTransit ||
+                           isOutForDelivery || isFailedDelivery || isCanceled || isUnfulfilled;
+        if (!anyMatched) counts['Other']++;
       });
       return counts;
     }
@@ -1413,12 +1410,27 @@
             log(`Saving ${data.orders.length} orders to Database...`);
             
             const ordersToInsert = data.orders.map(o => {
+              // Extract the latest shipment_status from Shopify fulfillments
+              // Shopify stores: in_transit, out_for_delivery, delivered, failure, attempted_delivery, label_printed etc.
+              const shipmentStatus = o.fulfillments && o.fulfillments.length > 0
+                ? (o.fulfillments[o.fulfillments.length - 1].shipment_status || '')
+                : '';
+              
+              // Encode shipment_status as a synthetic tag prefix so it's stored alongside real tags
+              // WITHOUT needing a schema change. Prefix: '__ss:' (shipment status)
+              let tagsWithStatus = o.tags || '';
+              // Remove any old __ss: synthetic tag first to avoid duplication on re-sync
+              tagsWithStatus = tagsWithStatus.split(',').filter(t => !t.trim().startsWith('__ss:')).join(',');
+              if (shipmentStatus) {
+                tagsWithStatus = tagsWithStatus ? `${tagsWithStatus},__ss:${shipmentStatus}` : `__ss:${shipmentStatus}`;
+              }
+
               const row = {
                 id: o.id,
                 name: o.name,
                 created_at: o.created_at,
                 total_price: o.total_price,
-                tags: o.tags,
+                tags: tagsWithStatus,
                 customer_fn: o.customer ? o.customer.first_name : null,
                 customer_ln: o.customer ? o.customer.last_name : null
               };
