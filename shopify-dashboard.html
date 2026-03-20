@@ -2273,7 +2273,7 @@
           <div class="day-header">
             <h2>${prettyDate}</h2>
             <div class="day-actions">
-              <span class="badge live" style="font-size: 14px;">Net: ${profitChar}${fmt(Math.abs(pl.profit))}</span>
+              <span class="badge" style="font-size: 14px; background: ${pl.profit >= 0 ? 'rgba(52, 211, 153, 0.2)' : 'rgba(248, 113, 113, 0.2)'}; color: ${pl.profit >= 0 ? 'var(--profit-color)' : 'var(--loss-color)'}; border: 1px solid ${pl.profit >= 0 ? 'var(--profit-color)' : 'var(--loss-color)'};">Net: ${profitChar}${fmt(Math.abs(pl.profit))}</span>
             </div>
           </div>
 
