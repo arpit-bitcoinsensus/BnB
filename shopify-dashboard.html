@@ -547,6 +547,24 @@
         </div>
       </div>
       <div class="metrics-grid" id="all-time-metrics"></div>
+
+      <div class="main-grid" style="grid-template-columns: 1fr; margin-bottom: 24px;">
+        <div class="card glass">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+            <div>
+              <h3 style="margin:0; font-size:14px; color:var(--text-muted); font-weight:500;">Orders</h3>
+              <div id="all-time-total-orders-chart" style="font-size: 32px; font-weight: 700; color: white; margin-top: 4px;">0</div>
+            </div>
+            <div style="color: var(--text-muted); cursor: help; font-size: 18px;">ⓘ</div>
+          </div>
+          <div style="position:relative; width:100%; height:320px">
+            <canvas id="allTimeChart"></canvas>
+          </div>
+          <div id="all-time-chart-legend" style="margin-top: 20px; display: flex; justify-content: center; gap: 24px; font-size: 12px; color: var(--text-muted);">
+            <!-- Legend rendered by JS -->
+          </div>
+        </div>
+      </div>
       
       <div class="card glass">
         <h3>Performance by Month</h3>
@@ -1104,13 +1122,21 @@
 
       function calculateCurrentMetrics() {
         // Aggregates current state metrics for AI context
-        const totalRev = state.orders.reduce((sum, o) => {
+        const viewMin = state.minDate ? new Date(state.minDate) : new Date(STORE_LAUNCH_DATE);
+        const viewMax = state.maxDate ? new Date(state.maxDate) : new Date();
+
+        const currentOrders = state.orders.filter(o => {
+          const d = new Date(o.created_at);
+          return d >= viewMin && d <= viewMax;
+        });
+
+        const totalRev = currentOrders.reduce((sum, o) => {
           const isDel = (o.tags || '').toLowerCase().includes('delivered');
           return sum + (isDel ? parseFloat(o.total_price || 0) : 0);
         }, 0);
         
-        const delivered = state.orders.filter(o => (o.tags || '').toLowerCase().includes('delivered')).length;
-        const totalOrders = state.orders.length;
+        const delivered = currentOrders.filter(o => (o.tags || '').toLowerCase().includes('delivered')).length;
+        const totalOrders = currentOrders.length;
         
         return {
           totalRev,
@@ -1659,7 +1685,14 @@
           log("Shopify sync failed: " + e.message);
         }
         // 2. Fetch everything locally from Supabase
-        state.orders = await fetchOrdersFromSupabase(minDate, maxDate);
+        // For All-Time/Custom, we fetch double the range to support comparison chart
+        let fetchMin = minDate;
+        if (state.view === 'all-time' || state.view === 'custom') {
+           const duration = new Date(maxDate).getTime() - new Date(minDate).getTime();
+           const prevMin = new Date(new Date(minDate).getTime() - duration - 1000); // extra buffer
+           fetchMin = prevMin.toISOString();
+        }
+        state.orders = await fetchOrdersFromSupabase(fetchMin, maxDate);
         // 3. Load Ad Spend from Supabase
         await loadAdCosts(dbMin, dbMax);
 
@@ -2585,9 +2618,15 @@
         document.getElementById('all-time-range').textContent = `From ${tMin.toLocaleDateString()} to ${tMax.toLocaleDateString()}`;
       }
 
-      let totalOrders = state.orders.length;
-      let totalRevenue = getTotalRevenue(state.orders);
-      let tCounts = categorizeOrders(state.orders);
+      // Filter orders for the CURRENT selected range
+      const currentOrders = state.orders.filter(o => {
+        const d = new Date(o.created_at);
+        return d >= tMin && d <= tMax;
+      });
+
+      let totalOrders = currentOrders.length;
+      let totalRevenue = getTotalRevenue(currentOrders);
+      let tCounts = categorizeOrders(currentOrders);
       let totalDelivered = tCounts['Delivered'] || 0;
       let totalFulfilled = tCounts['Fulfilled'] || 0;
       let totalCanceled = tCounts['Canceled'] || 0;
@@ -2596,12 +2635,12 @@
       let totalAdCost = Object.values(state.adCosts).reduce((sum, cost) => sum + cost, 0);
       
       const allItems = [];
-      state.orders.forEach(o => {
+      currentOrders.forEach(o => {
         const isDel = categorizeOrders([o])['Delivered'] > 0;
         const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
         if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
       });
-      const totalShopifySales = state.orders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
+      const totalShopifySales = currentOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
       const atPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allItems, totalShopifySales);
       const atRet = getRetentionMetrics();
 
@@ -2623,6 +2662,143 @@
         <div class="metric-card"><div class="metric-label">${titleOverride} Net P&L</div><div class="metric-value ${atPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(atPL.profit)}</div></div>
       `;
 
+      // Update Chart Count
+      if (document.getElementById(`${prefix}-total-orders-chart`)) {
+        document.getElementById(`${prefix}-total-orders-chart`).textContent = totalOrders;
+      }
+
+      // COMPARISON CHART LOGIC
+      if (prefix === 'all-time') {
+        const duration = tMax.getTime() - tMin.getTime();
+        const prevTMax = new Date(tMin.getTime() - 1);
+        const prevTMin = new Date(prevTMax.getTime() - duration);
+        
+        // Filter orders for both periods
+        const currOrders = state.orders.filter(o => {
+          const d = new Date(o.created_at);
+          return d >= tMin && d <= tMax;
+        });
+        const prevOrders = state.orders.filter(o => {
+          const d = new Date(o.created_at);
+          return d >= prevTMin && d <= prevTMax;
+        });
+
+        // Group by day-offset
+        const daysInPeriod = Math.ceil(duration / (1000 * 60 * 60 * 24)) + 1;
+        const currData = new Array(daysInPeriod).fill(0);
+        const prevData = new Array(daysInPeriod).fill(0);
+        const labels = [];
+
+        for(let i=0; i<daysInPeriod; i++) {
+          const d = new Date(tMin.getTime() + i * 24 * 60 * 60 * 1000);
+          const dStr = toDateStr(d);
+          labels.push(d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'}));
+          
+          currData[i] = currOrders.filter(o => {
+            const od = new Date(o.created_at);
+            const oIST = new Date(od.getTime() + (5.5 * 60 * 60 * 1000));
+            return oIST.toISOString().startsWith(dStr);
+          }).length;
+
+          const pD = new Date(prevTMin.getTime() + i * 24 * 60 * 60 * 1000);
+          const pDStr = toDateStr(pD);
+          prevData[i] = prevOrders.filter(o => {
+            const od = new Date(o.created_at);
+            const oIST = new Date(od.getTime() + (5.5 * 60 * 60 * 1000));
+            return oIST.toISOString().startsWith(pDStr);
+          }).length;
+        }
+
+        if (state.charts.allTime) state.charts.allTime.destroy();
+        const ctx = document.getElementById('allTimeChart').getContext('2d');
+        state.charts.allTime = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: `${tMin.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})} – ${tMax.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}`,
+                data: currData,
+                borderColor: '#3b82f6',
+                borderWidth: 3,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+                pointHoverBackgroundColor: '#3b82f6',
+                fill: false
+              },
+              {
+                label: `${prevTMin.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})} – ${prevTMax.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}`,
+                data: prevData,
+                borderColor: '#93c5fd',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                fill: false
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+              y: { 
+                beginAtZero: true,
+                ticks: { color: '#71717a', font: { size: 10 } },
+                grid: { color: 'rgba(255,255,255,0.05)' }
+              },
+              x: {
+                ticks: { 
+                  color: '#71717a', 
+                  font: { size: 10 },
+                  maxRotation: 0,
+                  autoSkip: true,
+                  maxTicksLimit: 8
+                },
+                grid: { display: false }
+              }
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#18181b',
+                titleColor: '#fff',
+                bodyColor: '#a1a1aa',
+                borderColor: '#27272a',
+                borderWidth: 1,
+                padding: 12,
+                displayColors: true,
+                callbacks: {
+                  title: (items) => {
+                    const idx = items[0].dataIndex;
+                    return `Orders Comparison`;
+                  },
+                  label: (item) => {
+                    return ` ${item.dataset.label}: ${item.formattedValue}`;
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        // Custom Legend
+        const legendContainer = document.getElementById('all-time-chart-legend');
+        legendContainer.innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div style="width:12px; height:12px; border-radius:50%; background:#3b82f6;"></div>
+            <span>${tMin.toLocaleDateString('en-US', {month:'short', day:'numeric'})} – ${tMax.toLocaleDateString('en-US', {month:'short', day:'numeric'})}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div style="width:12px; height:12px; border-radius:50%; background:#93c5fd; opacity:0.6;"></div>
+            <span>${prevTMin.toLocaleDateString('en-US', {month:'short', day:'numeric'})} – ${prevTMax.toLocaleDateString('en-US', {month:'short', day:'numeric'})}</span>
+          </div>
+        `;
+      }
+
       document.getElementById(`btn-ad-${prefix}-save`)?.addEventListener('click', () => {
         const val = document.getElementById(`ad-${prefix}-total`).value;
         saveBulkAdCost(tMin, tMax, val).then(() => fetchCurrentView(true));
@@ -2630,7 +2806,7 @@
 
       // Group by YY-MM for breakdown
       const monthGroups = {};
-      state.orders.forEach(o => {
+      currentOrders.forEach(o => {
         const oDate = new Date(o.created_at);
         const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
         const yymm = `${oIST.getFullYear()}-${String(oIST.getMonth()+1).padStart(2,'0')}`;
