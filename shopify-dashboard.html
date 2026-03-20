@@ -1224,30 +1224,59 @@
       counts['Other'] = 0;
 
       orders.forEach(o => {
-        const tags = (o.tags || '').split(',').map(t => t.trim().toLowerCase());
+        // Split tags into lowercase array for easy checking
+        const rawTags = (o.tags || '').split(',').map(t => t.trim().toLowerCase());
         const fs = (o.fulfillment_status || '').toLowerCase();
         const fin = (o.financial_status || '').toLowerCase();
-        let matched = false;
 
-        // Check custom tags first (exact STATUS_TAGS match)
+        // --- Determine exact delivery outcome from tags ---
+
+        // 1. RTO: any tag containing 'rto' (e.g. "RTO Initiated via Shiprocket", "RTO Delivered via Shiprocket")
+        const isRTO = rawTags.some(t => t.includes('rto'));
+
+        // 2. Delivered: tag is exactly 'delivered' AND NOT a failed/attempted delivery tag
+        //    Failed delivery and Attempted delivery should NOT increment Delivered
+        const hasDeliveredTag = rawTags.includes('delivered');
+        const hasFailedDelivery = rawTags.some(t => t.includes('failed delivery') || t === 'failed');
+        const hasAttemptedDelivery = rawTags.some(t => t.includes('attempted delivery') || t.includes('attempted'));
+        const isDelivered = hasDeliveredTag && !hasFailedDelivery && !hasAttemptedDelivery && !isRTO;
+
+        // 3. Cancelled: tag contains cancelled/canceled, or financial_status voided/refunded, or Shopify cancelled_at
+        const isCanceled = rawTags.some(t => t === 'canceled' || t === 'cancelled') ||
+                           fin === 'voided' || fin === 'refunded' || !!o.cancelled_at;
+
+        // 4. In Transit / Attempted Delivery: specific tags
+        const isInTransit = rawTags.includes('in transit');
+        const isAttempted = hasAttemptedDelivery && !isRTO && !isDelivered;
+        const isFailedDelivery = hasFailedDelivery && !isRTO && !isDelivered;
+
+        // 5. Fulfilled: Shopify says fulfilled but no delivery-outcome tag yet
+        const hasDeliveryOutcomeTag = isRTO || isDelivered || isCanceled || isAttempted || isFailedDelivery;
+        const isFulfilled = !hasDeliveryOutcomeTag && (fs === 'fulfilled' || fs === 'partial' || rawTags.includes('fulfilled'));
+
+        // 6. Unfulfilled fallback
+        const isUnfulfilled = !hasDeliveryOutcomeTag && !isFulfilled &&
+                              (fs === '' || fs === 'unfulfilled' || !fs);
+
+        // --- Apply counts (multiple can apply, e.g. both Fulfilled and later Delivered) ---
+        if (isRTO)           counts['RTO']++;
+        if (isDelivered)     counts['Delivered']++;
+        if (isAttempted || isFailedDelivery) counts['Attempted Delivery']++;
+        if (isInTransit)     counts['In Transit']++;
+        if (isCanceled)      counts['Canceled']++;
+        if (isFulfilled)     counts['Fulfilled']++;
+        if (isUnfulfilled)   counts['Unfulfilled']++;
+
+        // Check any remaining exact STATUS_TAGS that aren't covered above
         STATUS_TAGS.forEach(st => {
-          if (tags.includes(st.toLowerCase())) { counts[st]++; matched = true; }
+          const stLow = st.toLowerCase();
+          if (['rto','delivered','in transit','fulfilled','unfulfilled','canceled','attempted delivery'].includes(stLow)) return;
+          if (rawTags.includes(stLow)) counts[st]++;
         });
 
-        // Fallback: Shopify fulfillment/financial status
-        if (!matched) {
-          if (fs === 'fulfilled' || fs === 'partial') {
-            counts['Fulfilled']++; matched = true;
-          } else if (fin === 'voided' || fin === 'refunded' ||
-                     tags.some(t => t === 'cancelled' || t === 'canceled') ||
-                     o.cancelled_at) {
-            counts['Canceled']++; matched = true;
-          } else if (fs === null || fs === '' || fs === 'unfulfilled') {
-            counts['Unfulfilled']++; matched = true;
-          }
-        }
-
-        if (!matched) counts['Other']++;
+        const anyMatched = isRTO || isDelivered || isAttempted || isFailedDelivery ||
+                           isInTransit || isCanceled || isFulfilled || isUnfulfilled;
+        if (!anyMatched) counts['Other']++;
       });
       return counts;
     }
@@ -1256,7 +1285,12 @@
       return orders
         .filter(o => {
           const tags = (o.tags || '').toLowerCase().split(',').map(t => t.trim());
-          return tags.includes('delivered');
+          const isRTO = tags.some(t => t.includes('rto'));
+          const hasDelivered = tags.includes('delivered');
+          const hasFailed = tags.some(t => t.includes('failed delivery') || t === 'failed');
+          const hasAttempted = tags.some(t => t.includes('attempted delivery') || t.includes('attempted'));
+          // Only count as revenue if truly delivered (not RTO, not failed, not attempted)
+          return hasDelivered && !isRTO && !hasFailed && !hasAttempted;
         })
         .reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
     }
