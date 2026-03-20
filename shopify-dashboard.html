@@ -115,8 +115,8 @@
     .tag-count { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
     .tag-name { font-size: 12px; color: var(--text-muted); font-weight: 500; }
 
-    .tag-delivered .tag-count, .tag-fulfilled .tag-count { color: var(--profit-color); }
-    .tag-canceled .tag-count, .tag-rto .tag-count { color: var(--loss-color); }
+    .tag-delivered .tag-count { color: var(--profit-color); }
+    .tag-canceled .tag-count { color: var(--loss-color); }
     .tag-attempted-delivery .tag-count, .tag-payment-pending .tag-count { color: var(--warning-color); }
     .tag-in-transit .tag-count { color: var(--info-color); }
 
@@ -285,15 +285,13 @@
           <span>✨</span> Intelligence
         </button>
         <span id="conn-badge" class="badge live" style="display:none;"></span>
-        <button id="btn-sync-all" style="background: rgba(255,255,255,0.05); border-color: var(--border);">
-          Full History Sync
-        </button>
         <button id="btn-sync-now" class="primary">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;">
+
             <path d="M21.5 2v6h-6M2.13 15.57a9 9 0 0 0 16.59 2.07L21.5 14M2.5 22v-6h6M22.39 8.35A9 9 0 0 0 6.64 5.92L2.5 10"/>
           </svg>
           Sync Data
         </button>
+
       </div>
     </header>
 
@@ -476,10 +474,8 @@
               <tr>
                 <th>Day</th>
                 <th>Orders</th>
-                <th>Fulfilled</th>
                 <th>Delivered</th>
                 <th>Canceled</th>
-                <th>RTO</th>
                 <th>Net P&L</th>
               </tr>
             </thead>
@@ -581,10 +577,8 @@
             <tr>
               <th style="text-align:left; padding-bottom:8px; border-bottom:1px solid var(--border-color);">Month</th>
               <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color);">Orders</th>
-              <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color);">Fulfilled</th>
               <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color);">Delivered</th>
               <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color);">Canceled</th>
-              <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color);">RTO</th>
               <th style="padding-bottom:8px; border-bottom:1px solid var(--border-color); text-align:right;">Net P&L</th>
             </tr>
           </thead>
@@ -686,7 +680,6 @@
       'Fulfilled': '#34d399',
       'RTO': '#ef4444',
       'Other': '#52525b'
-    };
     };
     // CORE STATE
     const state = {
@@ -1212,9 +1205,6 @@
       }
     }
 
-    document.getElementById('btn-sync-now').addEventListener('click', () => fetchCurrentView(true));
-    document.getElementById('btn-sync-all').addEventListener('click', () => fetchCurrentView(true, true)); // Full sync
-
     document.getElementById('btn-fetch-daily').addEventListener('click', () => fetchCurrentView(true));
     document.getElementById('btn-fetch-weekly').addEventListener('click', () => fetchCurrentView(true));
     document.getElementById('btn-fetch-monthly').addEventListener('click', () => fetchCurrentView(true));
@@ -1239,35 +1229,22 @@
         const fin = (o.financial_status || '').toLowerCase();
         let matched = false;
 
-        // 1. Check custom tags (multiple can match per order)
+        // Check custom tags first (exact STATUS_TAGS match)
         STATUS_TAGS.forEach(st => {
-          if (tags.includes(st.toLowerCase())) { 
-            counts[st]++; 
-            matched = true; 
-          }
+          if (tags.includes(st.toLowerCase())) { counts[st]++; matched = true; }
         });
 
-        // 2. Integration logic: Shopify status fallbacks (if no matching tag was already found,
-        // or to capture "Fulfilled" if it's a Shopify status but not a tag)
-        if (fs === 'fulfilled' && !tags.includes('fulfilled')) {
-          counts['Fulfilled']++;
-          matched = true;
-        }
-
-        if (fs === 'partial' && !tags.includes('in transit')) {
-          counts['In Transit']++;
-          matched = true;
-        }
-
-        if ((fin === 'voided' || fin === 'refunded' || o.cancelled_at) && !tags.includes('canceled') && !tags.includes('cancelled')) {
-          counts['Canceled']++;
-          matched = true;
-        }
-
-        if ((fs === null || fs === '' || fs === 'unfulfilled') && !matched) {
-          counts['Unfulfilled']++;
-          matched = true;
-        }
+        // Fallback: Shopify fulfillment/financial status
+        if (!matched) {
+          if (fs === 'fulfilled' || fs === 'partial') {
+            counts['Fulfilled']++; matched = true;
+          } else if (fin === 'voided' || fin === 'refunded' ||
+                     tags.some(t => t === 'cancelled' || t === 'canceled') ||
+                     o.cancelled_at) {
+            counts['Canceled']++; matched = true;
+          } else if (fs === null || fs === '' || fs === 'unfulfilled') {
+            counts['Unfulfilled']++; matched = true;
+          }
         }
 
         if (!matched) counts['Other']++;
@@ -1535,9 +1512,9 @@
     }
 
     // Fetch Orchestrator
-    async function fetchCurrentView(isForce = false, isFullSync = false) {
+    async function fetchCurrentView(isForce = false) {
 
-      showLoading(isFullSync ? 'Syncing ENTIRE Shopify History...' : 'Syncing and loading orders...');
+      showLoading('Syncing and loading orders...');
 
       try {
         let minDate, maxDate, dbMin, dbMax;
@@ -2209,8 +2186,7 @@
         const maxRows = 50;
         const orderRows = dayOrders.slice(0, maxRows).map(o => {
           const tStr = o.tags || '';
-          const uniqueTags = [...new Set(tStr.split(',').map(t => t.trim()).filter(t => t))];
-          const tRender = uniqueTags.map(t => `<span class="order-tag">${t}</span>`).join('');
+          const tRender = tStr.split(',').filter(t=>t.trim()).map(t => `<span class="order-tag">${t.trim()}</span>`).join('');
           const fn = (o.customer && o.customer.first_name) || '';
           const ln = (o.customer && o.customer.last_name) || '';
           const time = o.created_at ? new Date(o.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
@@ -2241,10 +2217,9 @@
 
           <div class="metrics-grid" style="margin-bottom: 24px;">
             <div class="metric-card"><div class="metric-label">Orders</div><div class="metric-value">${dayOrders.length}</div></div>
+            <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--primary)">${fulfilledCount}</div></div>
             <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${tagsCounts['Fulfilled'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${deliveredCount}</div></div>
-            <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${tagsCounts['Canceled'] || 0}</div></div>
-            <div class="metric-card"><div class="metric-label">RTO</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
             <div class="metric-card">
               <div class="metric-label">Ad Spend</div>
@@ -2316,7 +2291,6 @@
       
       let totalOrders = 0;
       let totalRevenue = 0;
-      let totalFulfilled = 0;
       let totalDelivered = 0;
       let totalFulfilled = 0;
       let totalAdCost = 0;
@@ -2332,11 +2306,9 @@
         });
         const tCounts = categorizeOrders(dOrders);
         const dRev = getTotalRevenue(dOrders);
-        const dFul = tCounts['Fulfilled'] || 0;
         const dDel = tCounts['Delivered'] || 0;
         const dFul = tCounts['Fulfilled'] || 0;
         const dCanc = tCounts['Canceled'] || 0;
-        const dRTO = tCounts['RTO'] || 0;
         const dAd = state.adCosts[dStr] || 0;
         
         const dItems = [];
@@ -2353,7 +2325,6 @@
 
         totalOrders += dOrders.length;
         totalRevenue += dRev;
-        totalFulfilled += dFul;
         totalDelivered += dDel;
         totalFulfilled += (dFul + dDel);
         totalAdCost += dAd;
@@ -2362,7 +2333,6 @@
           label: d.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'}),
           dayLabel: d.toLocaleDateString('en-US', {weekday:'short'}),
           orders: dOrders.length,
-          fulfilled: dFul,
           delivered: dDel,
           canceled: dCanc,
           profit: dPL.profit,
@@ -2380,8 +2350,7 @@
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
         <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
-        <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${totalCanceled}</div></div>
-        <div class="metric-card"><div class="metric-label">RTO</div><div class="metric-value text-loss">${totalRTO}</div></div>
+        <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${wRet.repeatRate}%</div></div>
         <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
         <div class="metric-card">
           <div class="metric-label">Ad Spend</div>
@@ -2392,7 +2361,7 @@
         </div>
         <div class="metric-card"><div class="metric-label">Net P&L</div><div class="metric-value ${wPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(wPL.profit)}</div></div>
       `;
-edb022abf11f8cc7a60f521d88e50675b53801f3
+
       renderPLTable('weekly', wPL, totalDelivered);
 
       document.getElementById('btn-ad-weekly-save')?.addEventListener('click', () => {
@@ -2426,11 +2395,9 @@ edb022abf11f8cc7a60f521d88e50675b53801f3
     function renderMonthly(mStart, mEnd) {
       let totalOrders = 0;
       let totalRevenue = 0;
-      let totalFulfilled = 0;
       let totalDelivered = 0;
       let totalFulfilled = 0;
       let totalCanceled = 0;
-      let totalRTO = 0;
       let totalTransit = 0;
       let totalAdCost = 0;
       let totalShopifySales = 0;
@@ -2459,11 +2426,9 @@ edb022abf11f8cc7a60f521d88e50675b53801f3
 
         totalOrders += dOrders.length;
         totalRevenue += dRev;
-        totalFulfilled += tCounts['Fulfilled'] || 0;
         totalDelivered += dDel;
         totalFulfilled += (dFul + dDel);
         totalCanceled += tCounts['Canceled'] || 0;
-        totalRTO += tCounts['RTO'] || 0;
         totalTransit += tCounts['In Transit'] || 0;
         totalAdCost += dAd;
         totalShopifySales += dTotalSales;
@@ -2474,3 +2439,386 @@ edb022abf11f8cc7a60f521d88e50675b53801f3
 
       document.getElementById('monthly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
+        <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
+        <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
+        <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${mRet.repeatRate}%</div></div>
+        <div class="metric-card"><div class="metric-label">In Transit</div><div class="metric-value" style="color:var(--primary)">${totalTransit}</div></div>
+        <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${totalCanceled}</div></div>
+        <div class="metric-card"><div class="metric-label">RTO</div><div class="metric-value text-loss">${totalRTO}</div></div>
+        <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
+        <div class="metric-card">
+          <div class="metric-label">Ad Spend</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+            <input type="number" id="ad-monthly-total" class="inline-input" value="${totalAdCost}" style="width:70px; padding:6px;"/>
+            <button class="inline-btn primary" id="btn-ad-monthly-save">Save</button>
+          </div>
+        </div>
+        <div class="metric-card"><div class="metric-label">Net P&L</div><div class="metric-value ${mPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(mPL.profit)}</div></div>
+      `;
+
+      renderPLTable('monthly', mPL, totalDelivered);
+
+      document.getElementById('btn-ad-monthly-save')?.addEventListener('click', () => {
+        const val = document.getElementById('ad-monthly-total').value;
+        saveBulkAdCost(new Date(mStart), new Date(mEnd), val).then(() => fetchCurrentView(true));
+      });
+
+      if (state.charts.monthly) state.charts.monthly.destroy();
+      const ctx = document.getElementById('monthlyChart').getContext('2d');
+      state.charts.monthly = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: Array.from({length: mEnd.getDate()}, (_, i) => i + 1), // Days of the month
+          datasets: [
+            { label: 'Total Orders', data: Array.from({length: mEnd.getDate()}, (_, i) => {
+                const day = i + 1;
+                const dStr = toDateStr(new Date(mStart.getFullYear(), mStart.getMonth(), day));
+                const dOrders = state.orders.filter(o => {
+                  const oDate = new Date(o.created_at);
+                  const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
+                  return oIST.toISOString().startsWith(dStr);
+                });
+                return dOrders.length;
+              }), backgroundColor: '#fbbf24' },
+            { label: 'Delivered', data: Array.from({length: mEnd.getDate()}, (_, i) => {
+                const day = i + 1;
+                const dStr = toDateStr(new Date(mStart.getFullYear(), mStart.getMonth(), day));
+                const dOrders = state.orders.filter(o => {
+                  const oDate = new Date(o.created_at);
+                  const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
+                  return oIST.toISOString().startsWith(dStr);
+                });
+                const tCounts = categorizeOrders(dOrders);
+                return tCounts['Delivered'] || 0;
+              }), backgroundColor: '#34d399' }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            y: { ticks: { color: '#a1a1aa' }, grid: { color: '#27272a' } },
+            x: { 
+              ticks: { color: '#a1a1aa', autoSkip: false, maxRotation: 0, font: { size: 10 } },
+              grid: { display: false }
+            }
+          },
+          plugins: { legend: { labels: { color: '#a1a1aa' } } }
+        }
+      });
+    }
+
+    // RENDERING: ALL TIME & CUSTOM (They share the exact same logic & layout)
+    function renderAllTime(tMin, tMax, prefix) {
+      if (state.orders.length === 0) {
+        if(prefix === 'all-time') document.getElementById('all-time-range').textContent = 'No data available yet.';
+        return;
+      }
+      
+      // Find the actual lowest date in the orders
+      const orderDates = state.orders.map(o => new Date(o.created_at)).sort((a,b) => a - b);
+      const firstRealDate = orderDates[0];
+      const lastRealDate = orderDates[orderDates.length - 1];
+      
+      if(prefix === 'all-time') {
+        // Show the requested range in the subtitle for clarity
+        document.getElementById('all-time-range').textContent = `From ${tMin.toLocaleDateString()} to ${tMax.toLocaleDateString()}`;
+        const syncInd = document.getElementById('sync-status-indicator');
+        if (syncInd) {
+          syncInd.textContent = `${state.orders.length} orders in local database`;
+          syncInd.style.display = 'inline-block';
+        }
+      }
+
+      function parseDate(dStr) {
+        if (!dStr) return new Date(0);
+        // Handle common formats: YYYY-MM-DD, DD/MM/YYYY, etc.
+        let d = new Date(dStr);
+        if (isNaN(d.getTime()) && dStr.includes('/')) {
+            // Try DD/MM/YYYY
+            const parts = dStr.split(' ')[0].split('/');
+            if (parts.length === 3) {
+                d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00Z`);
+            }
+        }
+        return d;
+      }
+
+      // Filter orders for the CURRENT selected range
+      const currentOrders = state.orders.filter(o => {
+        const d = parseDate(o.created_at);
+        const inRange = d >= tMin && d <= tMax;
+        return inRange;
+      });
+
+
+      let totalOrders = currentOrders.length;
+      let totalRevenue = getTotalRevenue(currentOrders);
+      let tCounts = categorizeOrders(currentOrders);
+      let totalDelivered = tCounts['Delivered'] || 0;
+      let totalFulfilled = (tCounts['Fulfilled'] || 0) + totalDelivered;
+      let totalCanceled = tCounts['Canceled'] || 0;
+      let totalTransit = tCounts['In Transit'] || 0;
+      
+      let totalAdCost = Object.values(state.adCosts).reduce((sum, cost) => sum + cost, 0);
+      
+      const allItems = [];
+      currentOrders.forEach(o => {
+        const isDel = categorizeOrders([o])['Delivered'] > 0;
+        const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
+        if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
+      });
+      const totalShopifySales = currentOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
+      const atPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allItems, totalShopifySales);
+      const atRet = getRetentionMetrics();
+
+      const titleOverride = prefix === 'custom' ? 'Selected range' : 'Lifetime';
+
+      document.getElementById(`${prefix}-metrics`).innerHTML = `
+        <div class="metric-card"><div class="metric-label">${titleOverride} Orders</div><div class="metric-value">${totalOrders}</div></div>
+        <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
+        <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
+        <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${atRet.repeatRate}%</div></div>
+        <div class="metric-card"><div class="metric-label">${titleOverride} Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
+        <div class="metric-card">
+          <div class="metric-label">${titleOverride} Ad Spend</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+            <input type="number" id="ad-${prefix}-total" class="inline-input" value="${totalAdCost}" style="width:70px; padding:6px;"/>
+            <button class="inline-btn primary" id="btn-ad-${prefix}-save">Save</button>
+          </div>
+        </div>
+        <div class="metric-card"><div class="metric-label">${titleOverride} Net P&L</div><div class="metric-value ${atPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(atPL.profit)}</div></div>
+      `;
+
+      // Update Chart Count
+      if (document.getElementById(`${prefix}-total-orders-chart`)) {
+        document.getElementById(`${prefix}-total-orders-chart`).textContent = totalOrders;
+      }
+
+      // COMPARISON CHART LOGIC
+      if (prefix === 'all-time') {
+        const duration = tMax.getTime() - tMin.getTime();
+        const prevTMax = new Date(tMin.getTime() - 1);
+        const prevTMin = new Date(prevTMax.getTime() - duration);
+        
+        // Filter orders for both periods
+        const currOrders = state.orders.filter(o => {
+          const d = new Date(o.created_at);
+          return d >= tMin && d <= tMax;
+        });
+        const prevOrders = state.orders.filter(o => {
+          const d = new Date(o.created_at);
+          return d >= prevTMin && d <= prevTMax;
+        });
+
+        // Group by day-offset
+        const daysInPeriod = Math.ceil(duration / (1000 * 60 * 60 * 24)) + 1;
+        const currData = new Array(daysInPeriod).fill(0);
+        const prevData = new Array(daysInPeriod).fill(0);
+        const labels = [];
+
+        for(let i=0; i<daysInPeriod; i++) {
+          const d = new Date(tMin.getTime() + i * 24 * 60 * 60 * 1000);
+          const dStr = toDateStr(d);
+          labels.push(d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'}));
+          
+          const dOrders = currOrders.filter(o => {
+            const od = parseDate(o.created_at);
+            const odIST = new Date(od.getTime() + (5.5 * 60 * 60 * 1000));
+            return toDateStr(odIST) === dStr;
+          });
+          currData[i] = {
+            y: dOrders.length,
+            rev: dOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0),
+            date: d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+          };
+
+          const pD = new Date(prevTMin.getTime() + i * 24 * 60 * 60 * 1000);
+          const pDStr = toDateStr(pD);
+          const pOrders = prevOrders.filter(o => {
+            const od = parseDate(o.created_at);
+            const odIST = new Date(od.getTime() + (5.5 * 60 * 60 * 1000));
+            return toDateStr(odIST) === pDStr;
+          });
+          prevData[i] = {
+            y: pOrders.length,
+            rev: pOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0),
+            date: pD.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+          };
+        }
+
+        if (state.charts.allTime) state.charts.allTime.destroy();
+        const ctx = document.getElementById('allTimeChart').getContext('2d');
+        state.charts.allTime = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: `${tMin.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})} – ${tMax.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}`,
+                data: currData,
+                borderColor: '#3b82f6',
+                borderWidth: 3,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+                pointHoverBackgroundColor: '#3b82f6',
+                fill: false
+              },
+              {
+                label: `${prevTMin.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})} – ${prevTMax.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}`,
+                data: prevData,
+                borderColor: '#93c5fd',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                fill: false
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+              y: { 
+                beginAtZero: true,
+                ticks: { color: '#71717a', font: { size: 10 } },
+                grid: { color: 'rgba(255,255,255,0.05)' }
+              },
+              x: {
+                ticks: { 
+                  color: '#71717a', 
+                  font: { size: 10 },
+                  maxRotation: 0,
+                  autoSkip: true,
+                  maxTicksLimit: 8
+                },
+                grid: { display: false }
+              }
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#18181b',
+                titleColor: '#fff',
+                bodyColor: '#a1a1aa',
+                borderColor: '#27272a',
+                borderWidth: 1,
+                padding: 12,
+                displayColors: true,
+                callbacks: {
+                  title: (items) => {
+                    return items[0].raw.date;
+                  },
+                  label: (item) => {
+                    const d = item.raw;
+                    return [
+                      ` ${item.dataset.label}`,
+                      `   Orders: ${d.y}`,
+                      `   Revenue: ₹${d.rev.toLocaleString()}`
+                    ];
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        // Custom Legend
+        const legendContainer = document.getElementById('all-time-chart-legend');
+        legendContainer.innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div style="width:12px; height:12px; border-radius:50%; background:#3b82f6;"></div>
+            <span>${tMin.toLocaleDateString('en-US', {month:'short', day:'numeric'})} – ${tMax.toLocaleDateString('en-US', {month:'short', day:'numeric'})}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div style="width:12px; height:12px; border-radius:50%; background:#93c5fd; opacity:0.6;"></div>
+            <span>${prevTMin.toLocaleDateString('en-US', {month:'short', day:'numeric'})} – ${prevTMax.toLocaleDateString('en-US', {month:'short', day:'numeric'})}</span>
+          </div>
+        `;
+      }
+
+      document.getElementById(`btn-ad-${prefix}-save`)?.addEventListener('click', () => {
+        const val = document.getElementById(`ad-${prefix}-total`).value;
+        saveBulkAdCost(tMin, tMax, val).then(() => fetchCurrentView(true));
+      });
+
+      // Group by YY-MM for breakdown
+      const monthGroups = {};
+      currentOrders.forEach(o => {
+        const oDate = new Date(o.created_at);
+        const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
+        const yymm = `${oIST.getFullYear()}-${String(oIST.getMonth()+1).padStart(2,'0')}`;
+        if(!monthGroups[yymm]) monthGroups[yymm] = [];
+        monthGroups[yymm].push(o);
+      });
+
+      // Aggregate ad costs per month
+      const adCostsByMonth = {};
+      Object.entries(state.adCosts).forEach(([dStr, cost]) => {
+        const yymm = dStr.substring(0, 7); // YYYY-MM
+        if(!adCostsByMonth[yymm]) adCostsByMonth[yymm] = 0;
+        adCostsByMonth[yymm] += cost;
+      });
+
+      const sortedMonths = Object.keys(monthGroups).sort((a,b) => b.localeCompare(a));
+      
+      document.getElementById(`${prefix}-breakdown-tbody`).innerHTML = sortedMonths.map(yymm => {
+        const mOrders = monthGroups[yymm];
+        const mCounts = categorizeOrders(mOrders);
+        const mRev = getTotalRevenue(mOrders);
+        const mDel = mCounts['Delivered'] || 0;
+        const mCanc = mCounts['Canceled'] || 0;
+        const mAd = adCostsByMonth[yymm] || 0;
+        const mPL = calcPL(mRev, mDel, mAd);
+        
+        const dateObj = new Date(yymm + '-02'); // pad to avoid timezone shifts
+        const mLabel = dateObj.toLocaleDateString('en-US', {month: 'short', year: 'numeric'});
+
+        return `
+          <tr>
+            <td>${mLabel}</td>
+            <td>${mOrders.length}</td>
+            <td>${mDel}</td>
+            <td>${mCanc}</td>
+            <td class="${mPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmt(mPL.profit)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      renderPLTable(prefix, atPL, totalDelivered);
+    }
+
+    function renderPLTable(prefix, pl, deliveredCount) {
+      const bColor = pl.profit >= 0 ? 'var(--profit-color)' : 'var(--loss-color)';
+      const pText = pl.profit >= 0 ? 'Profit' : 'Loss';
+      const bStyle = `background: ${bColor}20; color: ${bColor}; border: 1px solid ${bColor}40`;
+      
+      const badge = document.getElementById(`${prefix}-pl-badge`);
+      if(badge) {
+        badge.textContent = `${pText}: ${fmt(pl.profit)}`;
+        badge.style = bStyle;
+      }
+
+      document.getElementById(`${prefix}-pl-table`).innerHTML = `
+        <tr style="background: rgba(var(--primary-glow), 0.05);">
+          <td><b>Shopify Gross Sales (All Orders)</b></td>
+          <td><b>${fmt(pl.shopifyGrossSales)}</b></td>
+        </tr>
+        <tr><td>Gross Revenue (Delivered Only)</td><td>${fmt(pl.revenue)}</td></tr>
+        <tr><td>− Total Product Cost (Delivered × CP)</td><td>${fmt(pl.productCost)}</td></tr>
+        <tr><td>− Total Logistics Cost (Fulfilled × Ship)</td><td>${fmt(pl.shippingCost)}</td></tr>
+        <tr><td>− Advertising Spend</td><td>${fmt(pl.adCost)}</td></tr>
+        <tr style="border-top: 1px solid #333;"><td>Total Expenses</td><td>${fmt(pl.totalCost)}</td></tr>
+        <tr class="total-row">
+          <td>Estimated Net ${pText}</td>
+          <td class="${pl.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmt(Math.abs(pl.profit))} ${pl.profit >= 0 ? '▲' : '▼'}</td>
+        </tr>
+      `;
+    }
+
+  </script>
+</body>
+</html>
