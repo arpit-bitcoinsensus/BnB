@@ -1224,73 +1224,73 @@
       counts['Other'] = 0;
 
       orders.forEach(o => {
-        // Split tags into lowercase array for easy checking
         const rawTags = (o.tags || '').split(',').map(t => t.trim().toLowerCase());
         const fs = (o.fulfillment_status || '').toLowerCase();
         const fin = (o.financial_status || '').toLowerCase();
 
-        // --- Determine exact delivery outcome from tags ---
-
-        // 1. RTO: any tag containing 'rto' (e.g. "RTO Initiated via Shiprocket", "RTO Delivered via Shiprocket")
+        // RTO: any tag containing 'rto' captures Shiprocket RTO tags
         const isRTO = rawTags.some(t => t.includes('rto'));
 
-        // 2. Delivered: tag is exactly 'delivered' AND NOT a failed/attempted delivery tag
-        //    Failed delivery and Attempted delivery should NOT increment Delivered
-        const hasDeliveredTag = rawTags.includes('delivered');
-        const hasFailedDelivery = rawTags.some(t => t.includes('failed delivery') || t === 'failed');
-        const hasAttemptedDelivery = rawTags.some(t => t.includes('attempted delivery') || t.includes('attempted'));
-        const isDelivered = hasDeliveredTag && !hasFailedDelivery && !hasAttemptedDelivery && !isRTO;
+        // Fulfilled: order was shipped out by Shopify (fulfillment_status = fulfilled)
+        // Count ALL fulfilled orders regardless of delivery outcome
+        const isFulfilled = (fs === 'fulfilled' || fs === 'partial');
 
-        // 3. Cancelled: tag contains cancelled/canceled, or financial_status voided/refunded, or Shopify cancelled_at
+        // Delivered: fulfilled + NOT an RTO
+        // Since Shopify/Shiprocket don't always add 'delivered' tag, we infer:
+        // fulfilled & no RTO = actually delivered to customer
+        // Exception: if a 'delivered' tag explicitly exists, trust it.
+        // Exception: if a 'failed delivery' signal exists & no RTO, don't count as delivered.
+        const hasExplicitDeliveredTag = rawTags.includes('delivered');
+        const hasFailedSignal = rawTags.some(t => t.includes('failed delivery'));
+        const hasAttemptedSignal = rawTags.some(t => t.includes('attempted delivery'));
+        const isDelivered = !isRTO && isFulfilled && !hasFailedSignal && !hasAttemptedSignal;
+        // Also allow explicit 'delivered' tag even if not fulfilled via status
+        const isDeliveredByTag = hasExplicitDeliveredTag && !isRTO && !hasFailedSignal && !hasAttemptedSignal;
+        const deliveredFinal = isDelivered || isDeliveredByTag;
+
+        // Attempted / Failed delivery bucket (not RTO, not delivered)
+        const isAttempted = !isRTO && (hasFailedSignal || hasAttemptedSignal);
+
+        // Cancelled
         const isCanceled = rawTags.some(t => t === 'canceled' || t === 'cancelled') ||
                            fin === 'voided' || fin === 'refunded' || !!o.cancelled_at;
 
-        // 4. In Transit / Attempted Delivery: specific tags
+        // In Transit
         const isInTransit = rawTags.includes('in transit');
-        const isAttempted = hasAttemptedDelivery && !isRTO && !isDelivered;
-        const isFailedDelivery = hasFailedDelivery && !isRTO && !isDelivered;
 
-        // 5. Fulfilled: Shopify says fulfilled but no delivery-outcome tag yet
-        const hasDeliveryOutcomeTag = isRTO || isDelivered || isCanceled || isAttempted || isFailedDelivery;
-        const isFulfilled = !hasDeliveryOutcomeTag && (fs === 'fulfilled' || fs === 'partial' || rawTags.includes('fulfilled'));
-
-        // 6. Unfulfilled fallback
-        const isUnfulfilled = !hasDeliveryOutcomeTag && !isFulfilled &&
+        // Unfulfilled fallback
+        const isUnfulfilled = !isFulfilled && !isCanceled &&
                               (fs === '' || fs === 'unfulfilled' || !fs);
 
-        // --- Apply counts (multiple can apply, e.g. both Fulfilled and later Delivered) ---
+        // Apply counts — Fulfilled is independent (all shipped orders)
+        if (isFulfilled)     counts['Fulfilled']++;
+        if (deliveredFinal)  counts['Delivered']++;
         if (isRTO)           counts['RTO']++;
-        if (isDelivered)     counts['Delivered']++;
-        if (isAttempted || isFailedDelivery) counts['Attempted Delivery']++;
+        if (isAttempted)     counts['Attempted Delivery']++;
         if (isInTransit)     counts['In Transit']++;
         if (isCanceled)      counts['Canceled']++;
-        if (isFulfilled)     counts['Fulfilled']++;
         if (isUnfulfilled)   counts['Unfulfilled']++;
 
-        // Check any remaining exact STATUS_TAGS that aren't covered above
-        STATUS_TAGS.forEach(st => {
-          const stLow = st.toLowerCase();
-          if (['rto','delivered','in transit','fulfilled','unfulfilled','canceled','attempted delivery'].includes(stLow)) return;
-          if (rawTags.includes(stLow)) counts[st]++;
-        });
-
-        const anyMatched = isRTO || isDelivered || isAttempted || isFailedDelivery ||
-                           isInTransit || isCanceled || isFulfilled || isUnfulfilled;
+        const anyMatched = isFulfilled || deliveredFinal || isRTO || isAttempted ||
+                           isInTransit || isCanceled || isUnfulfilled;
         if (!anyMatched) counts['Other']++;
       });
       return counts;
     }
 
     function getTotalRevenue(orders) {
+      // Revenue only from truly delivered orders:
+      // fulfilled + no RTO tag + no failed delivery signal
       return orders
         .filter(o => {
           const tags = (o.tags || '').toLowerCase().split(',').map(t => t.trim());
+          const fs = (o.fulfillment_status || '').toLowerCase();
           const isRTO = tags.some(t => t.includes('rto'));
-          const hasDelivered = tags.includes('delivered');
-          const hasFailed = tags.some(t => t.includes('failed delivery') || t === 'failed');
-          const hasAttempted = tags.some(t => t.includes('attempted delivery') || t.includes('attempted'));
-          // Only count as revenue if truly delivered (not RTO, not failed, not attempted)
-          return hasDelivered && !isRTO && !hasFailed && !hasAttempted;
+          const hasFailed = tags.some(t => t.includes('failed delivery'));
+          const hasAttempted = tags.some(t => t.includes('attempted delivery'));
+          const isFulfilled = fs === 'fulfilled' || fs === 'partial';
+          // Delivered = fulfilled + not RTO + not failed + not attempted
+          return isFulfilled && !isRTO && !hasFailed && !hasAttempted;
         })
         .reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
     }
