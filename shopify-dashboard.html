@@ -2157,7 +2157,7 @@
         const tagsCounts = categorizeOrders(dayOrders);
         const revenue = getTotalRevenue(dayOrders);
         const deliveredCount = tagsCounts['Delivered'] || 0;
-        const fulfilledCount = tagsCounts['Fulfilled'] || 0;
+        const fulfilledCount = (tagsCounts['Fulfilled'] || 0) + deliveredCount;
         const adCost = state.adCosts[dateStr] || 0;
         
         // Collect all items for the day to calculate accurate P&L
@@ -2324,7 +2324,7 @@
         totalOrders += dOrders.length;
         totalRevenue += dRev;
         totalDelivered += dDel;
-        totalFulfilled += dFul;
+        totalFulfilled += (dFul + dDel);
         totalAdCost += dAd;
 
         daysData.push({
@@ -2425,7 +2425,7 @@
         totalOrders += dOrders.length;
         totalRevenue += dRev;
         totalDelivered += dDel;
-        totalFulfilled += dFul;
+        totalFulfilled += (dFul + dDel);
         totalCanceled += tCounts['Canceled'] || 0;
         totalTransit += tCounts['In Transit'] || 0;
         totalAdCost += dAd;
@@ -2552,7 +2552,7 @@
       let totalRevenue = getTotalRevenue(currentOrders);
       let tCounts = categorizeOrders(currentOrders);
       let totalDelivered = tCounts['Delivered'] || 0;
-      let totalFulfilled = tCounts['Fulfilled'] || 0;
+      let totalFulfilled = (tCounts['Fulfilled'] || 0) + totalDelivered;
       let totalCanceled = tCounts['Canceled'] || 0;
       let totalTransit = tCounts['In Transit'] || 0;
       
