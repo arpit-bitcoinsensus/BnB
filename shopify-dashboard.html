@@ -543,8 +543,12 @@
             <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">To</label>
             <input type="date" id="all-time-to" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-hover); color: var(--text-color);">
           </div>
-          <button id="btn-apply-all-time" style="align-self: flex-end; padding: 7px 16px;">Apply</button>
+          <button id="btn-apply-all-time" class="primary" onclick="fetchCurrentView(false)" style="align-self: flex-end; padding: 7px 16px;">Apply</button>
+          <button id="btn-force-sync" onclick="fetchCurrentView(true)" style="align-self: flex-end; padding: 7px 16px; background:rgba(59, 130, 246, 0.1); border:1px solid #3b82f6; color:#60a5fa; border-radius:8px; cursor:pointer;">🔄 Force Sync</button>
         </div>
+      </div>
+      <div style="margin-top: 10px; margin-bottom: 20px; text-align: right;">
+        <span id="sync-status-indicator" style="font-size:11px; background:rgba(0,255,0,0.1); color:#00ff00; padding:4px 10px; border-radius:12px; display:none;"></span>
       </div>
       <div class="metrics-grid" id="all-time-metrics"></div>
 
@@ -1465,8 +1469,10 @@
 
           if (!err2 && late && late.length > 0) {
             let dt = new Date(late[0].created_at);
-            dt.setSeconds(dt.getSeconds() + 1); 
+            // LATEST FIX: Go back 24 hours from the last known order to ensure no status-update gaps
+            dt.setHours(dt.getHours() - 24); 
             fetchFrom = dt.toISOString();
+            console.log(`[sync] Starting overlap sync from: ${fetchFrom}`);
           }
         } else {
           console.log(`[sync] Gap detected at start of range. Earliest local: ${early[0].created_at}, Target start: ${minDate}. Fetching from start.`);
@@ -1484,7 +1490,8 @@
         .select('*, order_items(*)')
         .gte('created_at', minDate)
         .lte('created_at', maxDate)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(2000);
         
       if(error) throw error;
 
@@ -1515,45 +1522,42 @@
           const startDateStr = document.getElementById('sheet-start-date').value;
           const endDateStr = document.getElementById('sheet-end-date').value;
           dbMin = startDateStr; dbMax = endDateStr;
-          minDate = new Date(startDateStr + 'T00:00:00Z').toISOString();
-          maxDate = new Date(endDateStr + 'T23:59:59Z').toISOString();
+          minDate = new Date(startDateStr + 'T00:00:00+05:30').toISOString();
+          maxDate = new Date(endDateStr + 'T23:59:59+05:30').toISOString();
         } else if (state.view === 'products') {
           const startDateStr = document.getElementById('products-start-date').value;
           const endDateStr = document.getElementById('products-end-date').value;
           dbMin = startDateStr; dbMax = endDateStr;
-          minDate = new Date(startDateStr + 'T00:00:00Z').toISOString();
-          maxDate = new Date(endDateStr + 'T23:59:59Z').toISOString();
+          minDate = new Date(startDateStr + 'T00:00:00+05:30').toISOString();
+          maxDate = new Date(endDateStr + 'T23:59:59+05:30').toISOString();
         } else if (state.view === 'daily') {
           const startDateStr = document.getElementById('daily-start-date').value;
           const endDateStr = document.getElementById('daily-end-date').value;
           dbMin = startDateStr; dbMax = endDateStr;
-          minDate = new Date(startDateStr + 'T00:00:00Z').toISOString();
-          maxDate = new Date(endDateStr + 'T23:59:59Z').toISOString();
+          minDate = new Date(startDateStr + 'T00:00:00+05:30').toISOString();
+          maxDate = new Date(endDateStr + 'T23:59:59+05:30').toISOString();
         } else if (state.view === 'weekly') {
           const wDate = new Date(document.getElementById('weekly-date').value);
           const wStart = getWeekStart(wDate);
           const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate() + 6);
           dbMin = toDateStr(wStart); dbMax = toDateStr(wEnd);
-          minDate = new Date(dbMin + 'T00:00:00Z').toISOString();
-          maxDate = new Date(dbMax + 'T23:59:59Z').toISOString();
+          minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
+          maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
         } else if (state.view === 'monthly') {
           const y = parseInt(document.getElementById('monthly-year').value);
           const m = parseInt(document.getElementById('monthly-month').value);
           const mStart = new Date(y, m, 1);
           const mEnd = new Date(y, m + 1, 0);
           dbMin = toDateStr(mStart); dbMax = toDateStr(mEnd);
-          minDate = new Date(dbMin + 'T00:00:00Z').toISOString();
-          maxDate = new Date(dbMax + 'T23:59:59Z').toISOString();
+          minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
+          maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
         } else if (state.view === 'custom') {
           dbMin = document.getElementById('custom-from').value;
           dbMax = document.getElementById('custom-to').value;
-          if (!dbMin || !dbMax) {
-            alert('Please select a valid "From" and "To" date.');
-            hideLoading();
-            return;
+          if (dbMin && dbMax) {
+            minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
+            maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
           }
-          minDate = new Date(dbMin + 'T00:00:00Z').toISOString();
-          maxDate = new Date(dbMax + 'T23:59:59Z').toISOString();
         } else if (state.view === 'all-time') {
           const customFrom = document.getElementById('all-time-from').value;
           const customTo = document.getElementById('all-time-to').value;
@@ -1564,6 +1568,8 @@
             dbMin = STORE_LAUNCH_DATE; 
             dbMax = toDateStr(new Date());
           }
+          minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
+          maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
         }
 
         if (!dbMin || !dbMax) {
@@ -2516,6 +2522,11 @@
       if(prefix === 'all-time') {
         // Show the requested range in the subtitle for clarity
         document.getElementById('all-time-range').textContent = `From ${tMin.toLocaleDateString()} to ${tMax.toLocaleDateString()}`;
+        const syncInd = document.getElementById('sync-status-indicator');
+        if (syncInd) {
+          syncInd.textContent = `${state.orders.length} orders in local database`;
+          syncInd.style.display = 'inline-block';
+        }
       }
 
       function parseDate(dStr) {
