@@ -10,6 +10,18 @@
       "destination": "/api/proxy.js"
     },
     {
+      "source": "/api/ai-insights",
+      "destination": "/api/proxy.js"
+    },
+    {
+      "source": "/api/ai-chat",
+      "destination": "/api/proxy.js"
+    },
+    {
+      "source": "/webhook",
+      "destination": "/api/webhook.js"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/shopify-dashboard.html"
     }

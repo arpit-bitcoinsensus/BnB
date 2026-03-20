@@ -1,4 +1,12 @@
 proxy.log
 node_modules/
 .DS_Store
-.env
+**/.env
+.vercel
+*.csv
+compare_*.py
+generate_report.py
+find_extra_delivered.py
+final_alignment.py
+apply_fixes.py
+db_fixes.sql

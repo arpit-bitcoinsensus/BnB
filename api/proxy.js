@@ -12,6 +12,127 @@ app.use(express.json());
 const SHOPIFY_STORE_URL = process.env.SHOPIFY_STORE_URL;
 const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET;
 const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID || '';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+// AI Insights endpoint
+app.post('/api/ai-insights', async (req, res) => {
+  try {
+    if (!GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY not configured on server.' });
+    }
+
+    const { metrics, period } = req.body;
+
+    const prompt = `
+      You are a world-class E-commerce Business Analyst for "BnB Toys".
+      Analyze these store metrics and product performance for the period: ${period}
+      
+      FINANCIAL METRICS:
+      - Gross Revenue (Delivered): ₹${metrics.rev}
+      - Total Orders: ${metrics.orders} (Delivered: ${metrics.delivered})
+      - Advertising Spend: ₹${metrics.ad}
+      - Total Product Cost (CP): ₹${metrics.productCost}
+      - Total Logistics/Shipping Cost: ₹${metrics.logisticsCost}
+      - ESTIMATED NET PROFIT: ₹${metrics.netProfit}
+      - Customer Retention Rate: ${metrics.retention}%
+      
+      TOP PRODUCTS PERFORMANCE:
+      ${metrics.topProducts.map(p => `- ${p.title}: Sold ${p.sold}, Revenue ₹${p.rev}`).join('\n')}
+      
+      TASK:
+      Provide a highly strategic, data-driven analysis.
+      1. Give a 1-sentence executive summary focused on profitability and efficiency.
+      2. Provide 3 specific "Strategic Do's" (Focus on scaling winners, improving margins, or optimizing ad spend).
+      3. Provide 3 specific "Strategic Don'ts" (Address high costs, low margins, or retention gaps).
+      
+      SPECIAL FOCUS: 
+      - If Net Profit is low relative to Revenue, analyze why (Logistics? Product Cost? Ad Spend?).
+      - Provide advice for specific products listed in the performance section.
+      
+      FORMAT: Return JSON exactly like this:
+      {
+        "summary": "...",
+        "dos": ["...", "...", "..."],
+        "donts": ["...", "...", "..."]
+      }
+    `;
+
+    console.log(`[proxy] Requesting AI insights for period: ${period}...`);
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
+
+    const geminiResp = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { response_mime_type: "application/json" }
+      })
+    });
+
+    if (!geminiResp.ok) {
+      const err = await geminiResp.text();
+      throw new Error(`Gemini API failed: ${err}`);
+    }
+
+    const result = await geminiResp.json();
+    const aiText = result.candidates[0].content.parts[0].text;
+    res.json(JSON.parse(aiText));
+
+  } catch (err) {
+    console.error('[AI Proxy Error]:', err.message);
+    res.status(500).json({ error: 'AI Analysis failed: ' + err.message });
+  }
+});
+
+// AI Chat endpoint for custom questions
+app.post('/api/ai-chat', async (req, res) => {
+  try {
+    if (!GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY not configured on server.' });
+    }
+
+    const { message, history, context } = req.body;
+
+    // Build the system prompt with context
+    const systemPrompt = `
+      You are "BnB AI", a world-class E-commerce Business Analyst for "BnB Toys".
+      You are chatting with the store owner. 
+      You have access to the following current store metrics:
+      ${JSON.stringify(context)}
+
+      Your goal is to provide helpful, data-driven, and strategic answers to the owner's questions.
+      Be concise, professional, and insightful. If you don't know something based on the data, say so.
+    `;
+
+    const contents = [
+      { role: 'user', parts: [{ text: systemPrompt }] },
+      { role: 'model', parts: [{ text: "Understood. I am BnB AI, ready to analyze your store data. How can I help you today?" }] },
+      ...history,
+      { role: 'user', parts: [{ text: message }] }
+    ];
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+    const geminiResp = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents })
+    });
+
+    if (!geminiResp.ok) {
+      const err = await geminiResp.text();
+      throw new Error(`Gemini Chat failed: ${err}`);
+    }
+
+    const result = await geminiResp.json();
+    const aiResponse = result.candidates[0].content.parts[0].text;
+    res.json({ response: aiResponse });
+
+  } catch (err) {
+    console.error('[AI Chat Error]:', err.message);
+    res.status(500).json({ error: 'Chat failed: ' + err.message });
+  }
+});
 
 // In-memory token cache
 const tokenCache = {};
@@ -53,6 +174,12 @@ async function getAccessToken(storeUrl, clientId, clientSecret) {
 // Main proxy endpoint — credentials come from server env, not request headers
 app.get('/shopify-api/*path', async (req, res) => {
   try {
+    if (!SHOPIFY_STORE_URL || !SHOPIFY_CLIENT_SECRET) {
+      return res.status(500).json({
+        error: 'Missing Shopify credentials. Please set SHOPIFY_STORE_URL and SHOPIFY_CLIENT_SECRET in environment variables.'
+      });
+    }
+
     let accessToken = SHOPIFY_CLIENT_SECRET;
 
     // If it's a client secret (shpss_), exchange for access token using client_credentials
@@ -79,10 +206,15 @@ app.get('/shopify-api/*path', async (req, res) => {
     });
 
     const body = await shopifyResp.json();
+    const linkHeader = shopifyResp.headers.get('Link');
 
     if (!shopifyResp.ok) {
       console.error(`[proxy] Shopify error ${shopifyResp.status}:`, body);
       return res.status(shopifyResp.status).json(body);
+    }
+
+    if (linkHeader) {
+      body.pagination = { link: linkHeader };
     }
 
     res.status(200).json(body);
