@@ -1607,11 +1607,11 @@
           await renderStockAlerts();
           renderSheet();
         }
-        else if (state.view === 'products') renderProducts();
-        else if (state.view === 'daily') renderDaily(new Date(dbMin), new Date(dbMax));
-        else if (state.view === 'weekly') renderWeekly(new Date(dbMin), new Date(dbMax));
-        else if (state.view === 'monthly') renderMonthly(new Date(dbMin), new Date(dbMax));
-        else if (state.view === 'all-time') renderAllTime(new Date(dbMin), new Date(dbMax), 'all-time');
+        else if (state.view === 'products') renderProducts(minDate, maxDate);
+        else if (state.view === 'daily') renderDaily(new Date(minDate), new Date(maxDate));
+        else if (state.view === 'weekly') renderWeekly(new Date(minDate), new Date(maxDate));
+        else if (state.view === 'monthly') renderMonthly(new Date(minDate), new Date(maxDate));
+        else if (state.view === 'all-time') renderAllTime(new Date(minDate), new Date(maxDate), 'all-time');
         
         // Auto-update Intelligence if open
         if (document.getElementById('intel-drawer').classList.contains('active')) {
@@ -1971,21 +1971,18 @@
       `;
     }
 
-    async function renderProducts() {
+    async function renderProducts(minDate, maxDate) {
       const tbody = document.getElementById('products-tbody');
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px;">Analyzing product performance...</td></tr>';
       
       if (!sbClient) return;
       
-      const startDate = document.getElementById('products-start-date').value;
-      const endDate = document.getElementById('products-end-date').value;
-
       // Fetch items sold in range
       const { data, error } = await sbClient
         .from('order_items')
         .select('title, quantity, price')
-        .gte('created_at', `${startDate}T00:00:00`)
-        .lte('created_at', `${endDate}T23:59:59`);
+        .gte('created_at', minDate)
+        .lte('created_at', maxDate);
 
       if (error) {
         tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-loss)">Error: ${error.message}</td></tr>`;
