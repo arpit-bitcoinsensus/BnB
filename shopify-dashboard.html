@@ -2539,14 +2539,6 @@
         return inRange;
       });
 
-      console.log(`[DEBUG] Range: ${tMin.toISOString()} to ${tMax.toISOString()}`);
-      console.log(`[DEBUG] Total in state: ${state.orders.length}`);
-      console.log(`[DEBUG] Filtered current: ${currentOrders.length}`);
-      
-      if (state.orders.length > 0 && currentOrders.length < state.orders.length) {
-         const sampleExcluded = state.orders.find(o => !(parseDate(o.created_at) >= tMin && parseDate(o.created_at) <= tMax));
-         if (sampleExcluded) console.log("[DEBUG] Sample excluded order:", sampleExcluded.name, sampleExcluded.created_at);
-      }
 
       let totalOrders = currentOrders.length;
       let totalRevenue = getTotalRevenue(currentOrders);
