@@ -14,6 +14,10 @@
       "destination": "/api/proxy.js"
     },
     {
+      "source": "/api/ai-chat",
+      "destination": "/api/proxy.js"
+    },
+    {
       "source": "/webhook",
       "destination": "/api/webhook.js"
     },

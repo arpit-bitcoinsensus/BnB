@@ -84,6 +84,56 @@ app.post('/api/ai-insights', async (req, res) => {
   }
 });
 
+// AI Chat endpoint for custom questions
+app.post('/api/ai-chat', async (req, res) => {
+  try {
+    if (!GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY not configured on server.' });
+    }
+
+    const { message, history, context } = req.body;
+
+    // Build the system prompt with context
+    const systemPrompt = `
+      You are "BnB AI", a world-class E-commerce Business Analyst for "BnB Toys".
+      You are chatting with the store owner. 
+      You have access to the following current store metrics:
+      ${JSON.stringify(context)}
+
+      Your goal is to provide helpful, data-driven, and strategic answers to the owner's questions.
+      Be concise, professional, and insightful. If you don't know something based on the data, say so.
+    `;
+
+    const contents = [
+      { role: 'user', parts: [{ text: systemPrompt }] },
+      { role: 'model', parts: [{ text: "Understood. I am BnB AI, ready to analyze your store data. How can I help you today?" }] },
+      ...history,
+      { role: 'user', parts: [{ text: message }] }
+    ];
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+    const geminiResp = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents })
+    });
+
+    if (!geminiResp.ok) {
+      const err = await geminiResp.text();
+      throw new Error(`Gemini Chat failed: ${err}`);
+    }
+
+    const result = await geminiResp.json();
+    const aiResponse = result.candidates[0].content.parts[0].text;
+    res.json({ response: aiResponse });
+
+  } catch (err) {
+    console.error('[AI Chat Error]:', err.message);
+    res.status(500).json({ error: 'Chat failed: ' + err.message });
+  }
+});
+
 // In-memory token cache
 const tokenCache = {};
 
