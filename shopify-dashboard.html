@@ -668,12 +668,14 @@
     const PRODUCT_COST = 555;
     const SHIPPING_COST = 135;
     const STORE_LAUNCH_DATE = '2026-02-01'; // User can adjust this if needed
-    const STATUS_TAGS = ['Delivered','Canceled','Attempted Delivery','In Transit','Paid','Payment Pending','Unfulfilled','Fulfilled','RTO'];
+    const STATUS_TAGS = ['Delivered','Canceled','Attempted Delivery','In Transit','Out for Delivery','Failed Delivery','Paid','Payment Pending','Unfulfilled','Fulfilled','RTO'];
     const CHART_COLORS = {
       'Delivered': '#34d399',
       'Canceled': '#f87171',
       'Attempted Delivery': '#fbbf24',
       'In Transit': '#60a5fa',
+      'Out for Delivery': '#a78bfa',
+      'Failed Delivery': '#f97316',
       'Paid': '#34d399',
       'Payment Pending': '#fbbf24',
       'Unfulfilled': '#f87171',
@@ -1241,39 +1243,53 @@
         // Exception: if a 'delivered' tag explicitly exists, trust it.
         // Exception: if a 'failed delivery' signal exists & no RTO, don't count as delivered.
         const hasExplicitDeliveredTag = rawTags.includes('delivered');
-        const hasFailedSignal = rawTags.some(t => t.includes('failed delivery'));
+        // Detect Shiprocket-style delivery status tags
+        const hasFailedSignal    = rawTags.some(t => t.includes('failed delivery'));
         const hasAttemptedSignal = rawTags.some(t => t.includes('attempted delivery'));
-        const isDelivered = !isRTO && isFulfilled && !hasFailedSignal && !hasAttemptedSignal;
-        // Also allow explicit 'delivered' tag even if not fulfilled via status
+        const hasOutForDelivery  = rawTags.some(t => t.includes('out for delivery'));
+        const hasInTransitTag    = rawTags.some(t => t === 'in transit' || t.includes('in transit'));
+
+        // Delivered: fulfilled + no failure/RTO signal, or explicit 'delivered' tag
+        const isDelivered = !isRTO && isFulfilled && !hasFailedSignal && !hasAttemptedSignal
+                            && !hasOutForDelivery && !hasInTransitTag;
         const isDeliveredByTag = hasExplicitDeliveredTag && !isRTO && !hasFailedSignal && !hasAttemptedSignal;
         const deliveredFinal = isDelivered || isDeliveredByTag;
 
-        // Attempted / Failed delivery bucket (not RTO, not delivered)
-        const isAttempted = !isRTO && (hasFailedSignal || hasAttemptedSignal);
+        // In Transit (still en route, not yet out for delivery)
+        const isInTransit = hasInTransitTag && !hasOutForDelivery && !hasFailedSignal && !isRTO;
+
+        // Out for Delivery
+        const isOutForDelivery = hasOutForDelivery && !hasFailedSignal && !isRTO;
+
+        // Failed Delivery (delivery attempted but failed, not RTO)
+        const isFailedDelivery = hasFailedSignal && !isRTO;
+
+        // Attempted Delivery (legacy tag fallback)
+        const isAttempted = hasAttemptedSignal && !isRTO && !hasFailedSignal;
 
         // Cancelled
         const isCanceled = rawTags.some(t => t === 'canceled' || t === 'cancelled') ||
                            fin === 'voided' || fin === 'refunded' || !!o.cancelled_at;
 
-        // In Transit
-        const isInTransit = rawTags.includes('in transit');
-
         // Unfulfilled fallback
         const isUnfulfilled = !isFulfilled && !isCanceled &&
                               (fs === '' || fs === 'unfulfilled' || !fs);
 
-        // Apply counts — Fulfilled is independent (all shipped orders)
-        if (isFulfilled)     counts['Fulfilled']++;
-        if (deliveredFinal)  counts['Delivered']++;
-        if (isRTO)           counts['RTO']++;
-        if (isAttempted)     counts['Attempted Delivery']++;
-        if (isInTransit)     counts['In Transit']++;
-        if (isCanceled)      counts['Canceled']++;
-        if (isUnfulfilled)   counts['Unfulfilled']++;
+        // Apply counts — Fulfilled is always counted for all shipped orders
+        if (isFulfilled)       counts['Fulfilled']++;
+        if (deliveredFinal)    counts['Delivered']++;
+        if (isRTO)             counts['RTO']++;
+        if (isInTransit)       counts['In Transit']++;
+        if (isOutForDelivery)  counts['Out for Delivery']++;
+        if (isFailedDelivery)  counts['Failed Delivery']++;
+        if (isAttempted)       counts['Attempted Delivery']++;
+        if (isCanceled)        counts['Canceled']++;
+        if (isUnfulfilled)     counts['Unfulfilled']++;
 
-        const anyMatched = isFulfilled || deliveredFinal || isRTO || isAttempted ||
-                           isInTransit || isCanceled || isUnfulfilled;
-        if (!anyMatched) counts['Other']++;
+        const anyMatched = isFulfilled || deliveredFinal || isRTO || isInTransit ||
+                           isOutForDelivery || isFailedDelivery || isAttempted ||
+                           isCanceled || isUnfulfilled;
+        if (!anyMatched) counts['Other']++
       });
       return counts;
     }
@@ -2253,6 +2269,9 @@
             <div class="metric-card"><div class="metric-label">Orders</div><div class="metric-value">${dayOrders.length}</div></div>
             <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${tagsCounts['Fulfilled'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${deliveredCount}</div></div>
+            <div class="metric-card"><div class="metric-label">In Transit</div><div class="metric-value" style="color:#60a5fa">${tagsCounts['In Transit'] || 0}</div></div>
+            <div class="metric-card"><div class="metric-label">Out for Delivery</div><div class="metric-value" style="color:#a78bfa">${tagsCounts['Out for Delivery'] || 0}</div></div>
+            <div class="metric-card"><div class="metric-label">Failed Delivery</div><div class="metric-value" style="color:#f97316">${tagsCounts['Failed Delivery'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${tagsCounts['Canceled'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">RTO</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
