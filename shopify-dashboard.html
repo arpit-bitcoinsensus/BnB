@@ -1260,11 +1260,8 @@
         // Failed Delivery (delivery attempted but failed, not RTO)
         const isFailedDelivery = ssFailure && !isRTO;
 
-        // Delivered: explicit shipment 'delivered' OR (fulfilled + no failure/RTO/transit signals)
-        const isDelivered = !isRTO && (
-          ssDelivered || 
-          (isFulfilled && !ssInTransit && !ssOutForDel && !ssFailure)
-        );
+        // Delivered: strictly synchronized with revenue calculation
+        const isDelivered = isOrderDelivered(o);
 
         // Cancelled
         const isCanceled = rawTags.some(t => t === 'canceled' || t === 'cancelled') ||
@@ -1290,21 +1287,32 @@
       });
       return counts;
     }
+    function isOrderDelivered(o) {
+      const rawTags = (o.tags || '').split(',').map(t => t.trim().toLowerCase());
+      const fs = (o.fulfillment_status || '').toLowerCase();
+
+      const syntheticSS = rawTags.find(t => t.startsWith('__ss:'));
+      const shipmentStatus = syntheticSS ? syntheticSS.replace('__ss:', '') : '';
+
+      const isRTO = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto'));
+      const isFulfilled = (fs === 'fulfilled' || fs === 'partial');
+
+      const ssInTransit     = shipmentStatus === 'in_transit'    || rawTags.some(t => t.includes('in transit') && !t.startsWith('__ss:'));
+      const ssOutForDel     = shipmentStatus === 'out_for_delivery' || rawTags.some(t => t.includes('out for delivery') && !t.startsWith('__ss:'));
+      const ssFailure       = shipmentStatus === 'failure'        || shipmentStatus === 'attempted_delivery'
+                              || rawTags.some(t => (t.includes('failed delivery') || t.includes('attempted delivery')) && !t.startsWith('__ss:'));
+      const ssDelivered     = shipmentStatus === 'delivered'      || rawTags.some(t => t === 'delivered' && !t.startsWith('__ss:'));
+
+      return !isRTO && (
+        ssDelivered || 
+        (isFulfilled && !ssInTransit && !ssOutForDel && !ssFailure)
+      );
+    }
 
     function getTotalRevenue(orders) {
-      // Revenue only from truly delivered orders:
-      // fulfilled + no RTO tag + no failed delivery signal
+      // Revenue only from truly delivered orders
       return orders
-        .filter(o => {
-          const tags = (o.tags || '').toLowerCase().split(',').map(t => t.trim());
-          const fs = (o.fulfillment_status || '').toLowerCase();
-          const isRTO = tags.some(t => t.includes('rto'));
-          const hasFailed = tags.some(t => t.includes('failed delivery'));
-          const hasAttempted = tags.some(t => t.includes('attempted delivery'));
-          const isFulfilled = fs === 'fulfilled' || fs === 'partial';
-          // Delivered = fulfilled + not RTO + not failed + not attempted
-          return isFulfilled && !isRTO && !hasFailed && !hasAttempted;
-        })
+        .filter(isOrderDelivered)
         .reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
     }
 
