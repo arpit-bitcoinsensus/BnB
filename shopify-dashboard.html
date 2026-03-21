@@ -1069,7 +1069,7 @@
       return start;
     }
     function fmt(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
-    function fmtK(n) { return n >= 1000 ? '₹' + (n / 1000).toFixed(1) + 'K' : '₹' + Math.round(n); }
+    function fmtK(n) { return fmt(n); }
     function getTagClass(t) {
       return 'tag-' + t.toLowerCase().replace(/\s+/g, '-');
     }
