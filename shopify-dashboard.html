@@ -1335,6 +1335,74 @@
       });
       return counts;
     }
+    function getTagsCount(orders) {
+      const counts = {};
+      STATUS_TAGS.forEach(t => counts[t] = 0);
+      counts['Other'] = 0;
+
+      orders.forEach(o => {
+        const rawTags = (o.tags || '').split(',').map(t => t.trim().toLowerCase());
+        const fs = (o.fulfillment_status || '').toLowerCase();
+        const fin = (o.financial_status || '').toLowerCase();
+
+        // Extract synthetic shipment_status tag (stored as '__ss:<value>' during sync)
+        // Shopify shipment_status values: in_transit, out_for_delivery, delivered, failure,
+        // attempted_delivery, label_printed, label_purchased, ready_for_pickup
+        const syntheticSS = rawTags.find(t => t.startsWith('__ss:'));
+        const shipmentStatus = syntheticSS ? syntheticSS.replace('__ss:', '') : '';
+
+        // --- Detect delivery state ---
+
+        // RTO: Shiprocket tag containing 'rto'
+        const isRTO = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto'));
+
+        // Fulfilled: Shopify says order has been shipped out
+        const isFulfilled = (fs === 'fulfilled' || fs === 'partial');
+
+        // Shipment status signals (from synthetic tag OR plain Shiprocket text tags)
+        const ssInTransit     = shipmentStatus === 'in_transit'    || rawTags.some(t => t.includes('in transit') && !t.startsWith('__ss:'));
+        const ssOutForDel     = shipmentStatus === 'out_for_delivery' || rawTags.some(t => t.includes('out for delivery') && !t.startsWith('__ss:'));
+        const ssFailure       = shipmentStatus === 'failure'        || shipmentStatus === 'attempted_delivery'
+                                || rawTags.some(t => (t.includes('failed delivery') || t.includes('attempted delivery')) && !t.startsWith('__ss:'));
+        const ssDelivered     = shipmentStatus === 'delivered'      || rawTags.some(t => t === 'delivered' && !t.startsWith('__ss:'));
+
+        // In Transit: package is en route
+        const isInTransit = ssInTransit && !ssOutForDel && !ssFailure && !ssDelivered && !isRTO;
+
+        // Out for Delivery
+        const isOutForDelivery = ssOutForDel && !ssFailure && !ssDelivered && !isRTO;
+
+        // Failed Delivery (delivery attempted but failed, not RTO)
+        const isFailedDelivery = ssFailure && !isRTO;
+
+        // Delivered: strictly synchronized with revenue calculation
+        const isDelivered = isOrderDelivered(o);
+
+        // Cancelled
+        const isCanceled = rawTags.some(t => t === 'canceled' || t === 'cancelled') ||
+                           fin === 'voided' || fin === 'refunded' || !!o.cancelled_at;
+
+        // Unfulfilled fallback
+        const isUnfulfilled = !isFulfilled && !isCanceled &&
+                              (fs === '' || fs === 'unfulfilled' || !fs);
+
+        // Apply counts
+        if (isFulfilled)       counts['Fulfilled']++;
+        if (isDelivered)       counts['Delivered']++;
+        if (isRTO)             counts['RTO']++;
+        if (isInTransit)       counts['In Transit']++;
+        if (isOutForDelivery)  counts['Out for Delivery']++;
+        if (isFailedDelivery)  counts['Failed Delivery']++;
+        if (isCanceled)        counts['Canceled']++;
+        if (isUnfulfilled)     counts['Unfulfilled']++;
+
+        const anyMatched = isFulfilled || isDelivered || isRTO || isInTransit ||
+                           isOutForDelivery || isFailedDelivery || isCanceled || isUnfulfilled;
+        if (!anyMatched) counts['Other']++;
+      });
+      return counts;
+    }
+
     function isOrderDelivered(o) {
       const rawTags = (o.tags || '').split(',').map(t => t.trim().toLowerCase());
       const fs = (o.fulfillment_status || '').toLowerCase();
