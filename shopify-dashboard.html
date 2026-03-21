@@ -303,6 +303,7 @@
       <div class="tab" data-target="weekly">Weekly</div>
       <div class="tab" data-target="monthly">Monthly</div>
       <div class="tab" data-target="all-time">All Time</div>
+      <div class="tab" data-target="analytics">Business Analytics</div>
     </div>
 
     <!-- SHEET VIEW (New Spreadsheet Style) -->
@@ -596,6 +597,42 @@
         </table>
       </div>
 
+  </div>
+
+  <!-- BUSINESS ANALYTICS VIEW -->
+  <div id="view-analytics" class="view-content">
+    <div class="controls-bar glass">
+      <div style="flex: 1;">
+        <h2 style="margin: 0; font-size: 20px;">Business Analytics Overview</h2>
+        <p style="margin: 4px 0 0 0; color: var(--text-muted); font-size: 14px;" id="analytics-range">Select a date range</p>
+      </div>
+      <div style="display: flex; align-items: center; gap: 15px;">
+        <div>
+          <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">From</label>
+          <input type="date" id="analytics-start-date" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-hover); color: var(--text-color);">
+        </div>
+        <div>
+          <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">To</label>
+          <input type="date" id="analytics-end-date" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-hover); color: var(--text-color);">
+        </div>
+        <button id="btn-fetch-analytics" class="primary" style="align-self: flex-end; padding: 7px 16px;">Fetch Data</button>
+      </div>
+    </div>
+
+    <div class="metrics-grid" id="analytics-metrics">
+      <div class="metric-card"><div class="metric-label">Delivery Rate</div><div class="metric-value text-profit" id="analytics-delivery-rate">0%</div></div>
+      <div class="metric-card"><div class="metric-label">RTO Rate</div><div class="metric-value text-loss" id="analytics-rto-rate">0%</div></div>
+      <div class="metric-card"><div class="metric-label">Cancellation Rate</div><div class="metric-value text-loss" id="analytics-cancel-rate">0%</div></div>
+    </div>
+
+    <div class="main-grid" style="grid-template-columns: 1fr;">
+      <div class="card glass">
+        <h3>Order Status Distribution</h3>
+        <div style="position:relative; width:100%; height:320px; display: flex; justify-content: center;">
+          <canvas id="analyticsPieChart"></canvas>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Loading Overlay -->
@@ -1193,6 +1230,16 @@
       if (!document.getElementById('all-time-to').value) {
         document.getElementById('all-time-to').value = toDateStr(now);
       }
+      
+      // Analytics: Default to last 30 days
+      if (!document.getElementById('analytics-start-date').value) {
+        let d = new Date(now);
+        d.setDate(d.getDate() - 30);
+        document.getElementById('analytics-start-date').value = toDateStr(d);
+      }
+      if (!document.getElementById('analytics-end-date').value) {
+        document.getElementById('analytics-end-date').value = toDateStr(now);
+      }
 
       // Populate months and years exactly once
       const mSel = document.getElementById('monthly-month');
@@ -1210,7 +1257,8 @@
     document.getElementById('btn-fetch-daily').addEventListener('click', () => fetchCurrentView(true));
     document.getElementById('btn-fetch-weekly').addEventListener('click', () => fetchCurrentView(true));
     document.getElementById('btn-fetch-monthly').addEventListener('click', () => fetchCurrentView(true));
-    document.getElementById('btn-apply-all-time').addEventListener('click', () => fetchCurrentView(true));
+    document.getElementById('btn-apply-all-time')?.addEventListener('click', () => fetchCurrentView(true));
+    document.getElementById('btn-fetch-analytics')?.addEventListener('click', () => fetchCurrentView(true));
     function showLoading(msg) {
       document.getElementById('loading').classList.add('active');
       document.getElementById('loading-msg').textContent = msg || '';
@@ -1641,6 +1689,13 @@
           }
           minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
           maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
+        } else if (state.view === 'analytics') {
+          dbMin = document.getElementById('analytics-start-date').value;
+          dbMax = document.getElementById('analytics-end-date').value;
+          if (dbMin && dbMax) {
+            minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
+            maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
+          }
         }
 
         if (!dbMin || !dbMax) {
@@ -1683,6 +1738,7 @@
         else if (state.view === 'weekly') renderWeekly(new Date(minDate), new Date(maxDate));
         else if (state.view === 'monthly') renderMonthly(new Date(minDate), new Date(maxDate));
         else if (state.view === 'all-time') renderAllTime(new Date(minDate), new Date(maxDate), 'all-time');
+        else if (state.view === 'analytics') renderAnalytics(minDate, maxDate);
         
         // Auto-update Intelligence if open
         if (document.getElementById('intel-drawer').classList.contains('active')) {
@@ -2863,6 +2919,88 @@
       }).join('');
 
       renderPLTable(prefix, atPL, totalDelivered);
+    }
+
+    function renderAnalytics(minDateStr, maxDateStr) {
+      document.getElementById('analytics-range').textContent = `${new Date(minDateStr).toLocaleDateString()} to ${new Date(maxDateStr).toLocaleDateString()}`;
+      
+      const currentOrders = state.orders; // Filtered by the fetch step
+      
+      // Calculate Rates
+      const counts = getTagsCount(currentOrders);
+      
+      const delivered = counts['Delivered'] || 0;
+      const rto = counts['RTO'] || 0;
+      const failed = counts['Failed Delivery'] || 0;
+      const canceled = counts['Canceled'] || 0;
+      const inTransit = counts['In Transit'] || 0;
+      const totalOrders = currentOrders.length;
+      
+      // Shipped = Delivered + RTO + Failed + In Transit
+      const totalShipped = delivered + rto + failed + inTransit;
+      
+      const deliveryRate = totalShipped > 0 ? ((delivered / totalShipped) * 100).toFixed(1) : 0;
+      const rtoRate = totalShipped > 0 ? ((rto / totalShipped) * 100).toFixed(1) : 0;
+      const cancelRate = totalOrders > 0 ? ((canceled / totalOrders) * 100).toFixed(1) : 0;
+      
+      document.getElementById('analytics-delivery-rate').textContent = `${deliveryRate}%`;
+      document.getElementById('analytics-rto-rate').textContent = `${rtoRate}%`;
+      document.getElementById('analytics-cancel-rate').textContent = `${cancelRate}%`;
+      
+      // Render Pie Chart
+      const ctx = document.getElementById('analyticsPieChart').getContext('2d');
+      if (state.charts.analyticsPie) {
+        state.charts.analyticsPie.destroy();
+      }
+      
+      state.charts.analyticsPie = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Delivered', 'In Transit', 'RTO', 'Canceled', 'Failed', 'Other'],
+          datasets: [{
+            data: [
+              delivered,
+              inTransit,
+              rto,
+              canceled,
+              failed,
+              totalOrders - (delivered + inTransit + rto + canceled + failed)
+            ],
+            backgroundColor: [
+              CHART_COLORS['Delivered'],
+              CHART_COLORS['In Transit'],
+              CHART_COLORS['RTO'],
+              CHART_COLORS['Canceled'],
+              CHART_COLORS['Failed Delivery'],
+              CHART_COLORS['Other']
+            ],
+            borderWidth: 0,
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          color: '#ffffff',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#a1a1aa', padding: 20, font: { family: 'Inter', size: 12 } }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const val = context.raw || 0;
+                  const total = context.chart._metasets[context.datasetIndex].total || 1;
+                  const percentage = ((val / total) * 100).toFixed(1) + '%';
+                  return ` ${context.label}: ${val} (${percentage})`;
+                }
+              }
+            }
+          },
+          cutout: '65%'
+        }
+      });
     }
 
     function renderPLTable(prefix, pl, deliveredCount) {
