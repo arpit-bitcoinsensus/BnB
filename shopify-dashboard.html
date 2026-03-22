@@ -1373,18 +1373,10 @@
       const shipmentStatus = syntheticSS ? syntheticSS.replace('__ss:', '') : '';
 
       const isRTO = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto'));
-      const isFulfilled = (fs === 'fulfilled' || fs === 'partial');
+      
+      const ssDelivered = shipmentStatus === 'delivered' || rawTags.some(t => (t === 'delivered' || t.includes('delivered')) && !t.includes('out for') && !t.includes('failed') && !t.includes('attempted') && !t.startsWith('__ss:'));
 
-      const ssInTransit     = shipmentStatus === 'in_transit'    || rawTags.some(t => t.includes('in transit') && !t.startsWith('__ss:'));
-      const ssOutForDel     = shipmentStatus === 'out_for_delivery' || rawTags.some(t => t.includes('out for delivery') && !t.startsWith('__ss:'));
-      const ssFailure       = shipmentStatus === 'failure'        || shipmentStatus === 'attempted_delivery'
-                              || rawTags.some(t => (t.includes('failed delivery') || t.includes('attempted delivery')) && !t.startsWith('__ss:'));
-      const ssDelivered     = shipmentStatus === 'delivered'      || rawTags.some(t => t === 'delivered' && !t.startsWith('__ss:'));
-
-      return !isRTO && (
-        ssDelivered || 
-        (isFulfilled && !ssInTransit && !ssOutForDel && !ssFailure)
-      );
+      return !isRTO && ssDelivered;
     }
 
     function getTotalRevenue(orders) {
