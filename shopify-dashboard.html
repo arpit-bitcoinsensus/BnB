@@ -1391,7 +1391,21 @@
       // Revenue only from truly delivered orders
       return orders
         .filter(isOrderDelivered)
-        .reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
+        .reduce((sum, o) => {
+          // If perfectly fulfilled, use total order value (includes discounts properly)
+          if (o.fulfillment_status === 'fulfilled') {
+            return sum + parseFloat(o.total_price || 0);
+          }
+          // If partially fulfilled, only sum up the completed items
+          if (o.fulfillment_status === 'partial' && o.line_items && o.line_items.length > 0) {
+            const fulfilledItems = o.line_items.filter(li => li.fulfillment_status === 'fulfilled');
+            if (fulfilledItems.length > 0) {
+              return sum + fulfilledItems.reduce((s, li) => s + (parseFloat(li.price || 0) * parseInt(li.quantity || 1)), 0);
+            }
+          }
+          // Fallback (e.g. unfulfilled state or old data missing fulfillment_status)
+          return sum + parseFloat(o.total_price || 0);
+        }, 0);
     }
 
     function calcPL(revenue, deliveredCount, adCost, fulfilledCount = 0, items = [], totalShopifyRevenue = 0) {
@@ -1541,7 +1555,7 @@
             data.orders.forEach(o => {
               if (o.line_items) {
                 o.line_items.forEach(li => {
-                  lineItems.push({
+                  const row = {
                     id: li.id,
                     order_id: o.id,
                     product_id: li.product_id,
@@ -1550,7 +1564,9 @@
                     quantity: li.quantity,
                     price: li.price,
                     sku: li.sku
-                  });
+                  };
+                  if (li.fulfillment_status) row.fulfillment_status = li.fulfillment_status;
+                  lineItems.push(row);
                 });
               }
             });
