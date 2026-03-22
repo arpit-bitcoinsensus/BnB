@@ -1374,7 +1374,7 @@
 
       const isRTO = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto'));
       
-      const ssDelivered = shipmentStatus === 'delivered' || rawTags.some(t => (t === 'delivered' || t.includes('delivered')) && !t.includes('out for') && !t.includes('failed') && !t.includes('attempted') && !t.startsWith('__ss:'));
+      const ssDelivered = shipmentStatus === 'delivered' || rawTags.some(t => t === 'delivered' && !t.startsWith('__ss:'));
 
       return !isRTO && ssDelivered;
     }
