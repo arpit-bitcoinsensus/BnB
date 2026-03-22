@@ -1317,8 +1317,11 @@
         // Unreachable: Shiprocket tag containing 'unreachable'
         const isUnreachable = rawTags.some(t => !t.startsWith('__ss:') && t.includes('unreachable'));
 
-        // Fulfilled: Shopify says order has been shipped out
-        const isFulfilled = (fs === 'fulfilled' || fs === 'partial');
+        // Delivered: strictly synchronized with revenue calculation
+        const isDelivered = isOrderDelivered(o);
+
+        // Fulfilled: Shopify says order has been shipped out OR it is delivered
+        const isFulfilled = (fs === 'fulfilled' || fs === 'partial') || isDelivered;
 
         // Shipment status signals (from synthetic tag OR plain Shiprocket text tags)
         const ssInTransit     = shipmentStatus === 'in_transit'    || rawTags.some(t => t.includes('in transit') && !t.startsWith('__ss:'));
@@ -1335,9 +1338,6 @@
 
         // Failed Delivery (delivery attempted but failed, not RTO)
         const isFailedDelivery = ssFailure && !isRTO;
-
-        // Delivered: strictly synchronized with revenue calculation
-        const isDelivered = isOrderDelivered(o);
 
         // Cancelled
         const isCanceled = rawTags.some(t => t === 'canceled' || t === 'cancelled') ||
@@ -2314,7 +2314,7 @@
         const tagsCounts = categorizeOrders(dayOrders);
         const revenue = getTotalRevenue(dayOrders);
         const deliveredCount = tagsCounts['Delivered'] || 0;
-        const fulfilledCount = (tagsCounts['Fulfilled'] || 0) + deliveredCount;
+        const fulfilledCount = tagsCounts['Fulfilled'] || 0;
         const adCost = state.adCosts[dateStr] || 0;
         
         // Collect all items for the day to calculate accurate P&L
@@ -2487,7 +2487,7 @@
         totalOrders += dOrders.length;
         totalRevenue += dRev;
         totalDelivered += dDel;
-        totalFulfilled += (dFul + dDel);
+        totalFulfilled += dFul;
         totalAdCost += dAd;
 
         daysData.push({
@@ -2588,7 +2588,7 @@
         totalOrders += dOrders.length;
         totalRevenue += dRev;
         totalDelivered += dDel;
-        totalFulfilled += (dFul + dDel);
+        totalFulfilled += dFul;
         totalCanceled += tCounts['Canceled'] || 0;
         totalTransit += tCounts['In Transit'] || 0;
         totalAdCost += dAd;
@@ -2716,7 +2716,7 @@
       let totalRevenue = getTotalRevenue(currentOrders);
       let tCounts = categorizeOrders(currentOrders);
       let totalDelivered = tCounts['Delivered'] || 0;
-      let totalFulfilled = (tCounts['Fulfilled'] || 0) + totalDelivered;
+      let totalFulfilled = tCounts['Fulfilled'] || 0;
       let totalCanceled = tCounts['Canceled'] || 0;
       let totalTransit = tCounts['In Transit'] || 0;
       
