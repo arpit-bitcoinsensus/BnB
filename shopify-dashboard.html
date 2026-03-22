@@ -2362,13 +2362,59 @@
           const fn = (o.customer && o.customer.first_name) || '';
           const ln = (o.customer && o.customer.last_name) || '';
           const time = o.created_at ? new Date(o.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+          let itemsHtml = '';
+          if (o.line_items && o.line_items.length > 0) {
+            const isOrderDeliv = isOrderDelivered(o);
+            itemsHtml = '<div style="margin-top: 12px; font-size: 13px; color: var(--text-muted); background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px;">';
+            
+            o.line_items.forEach(li => {
+              const isItemFulfilled = li.fulfillment_status === 'fulfilled';
+              let revAdded = 0;
+              let statusText = '';
+              let statusColor = 'var(--text-muted)';
+              
+              if (o.fulfillment_status === 'fulfilled') {
+                revAdded = parseFloat(li.price) * li.quantity;
+                statusText = isOrderDeliv ? '✓ Delivered' : 'Fulfilled';
+                statusColor = isOrderDeliv ? 'var(--profit-color)' : 'var(--text-muted)';
+              } else if (o.fulfillment_status === 'partial') {
+                if (isItemFulfilled) {
+                  revAdded = parseFloat(li.price) * li.quantity;
+                  statusText = isOrderDeliv ? '✓ Delivered' : 'Fulfilled';
+                  statusColor = isOrderDeliv ? 'var(--profit-color)' : 'var(--text-muted)';
+                } else {
+                  statusText = '✗ Undelivered';
+                  statusColor = 'var(--loss-color)';
+                }
+              } else {
+                const fsStr = (o.fulfillment_status || 'Unfulfilled');
+                statusText = fsStr.charAt(0).toUpperCase() + fsStr.slice(1);
+              }
+              
+              const showRev = isOrderDeliv && revAdded > 0;
+              const revHtml = showRev ? `<span style="color:var(--profit-color)">+${fmt(revAdded)}</span>` : `<span style="opacity: 0.5">-</span>`;
+              
+              itemsHtml += `
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;">
+                  <span style="flex:1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 12px;">${li.quantity}x ${li.title}</span>
+                  <span style="width: 100px; text-align: left; color: ${statusColor}">${statusText}</span>
+                  <span style="width: 80px; text-align: right; font-family: monospace;">${revHtml}</span>
+                </div>
+              `;
+            });
+            itemsHtml += '</div>';
+          }
+
           return `
             <tr>
-              <td>${o.name}</td>
-              <td>${fn} ${ln}</td>
-              <td>${fmt(o.total_price)}</td>
-              <td><div class="order-tags">${tRender}</div></td>
-              <td>${time}</td>
+              <td style="vertical-align: top; padding-top: 16px;">
+                <div style="font-weight: 500">${o.name}</div>
+                ${itemsHtml}
+              </td>
+              <td style="vertical-align: top; padding-top: 16px;">${fn} ${ln}</td>
+              <td style="vertical-align: top; padding-top: 16px;">${fmt(o.total_price)}</td>
+              <td style="vertical-align: top; padding-top: 16px;"><div class="order-tags">${tRender}</div></td>
+              <td style="vertical-align: top; padding-top: 16px;">${time}</td>
             </tr>
           `;
         }).join('');
