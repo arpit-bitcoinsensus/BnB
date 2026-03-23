@@ -427,20 +427,26 @@
 
     <!-- DAILY VIEW (Scrollable Feed) -->
     <div id="view-daily" class="view-content">
-      <div class="controls-bar">
-        <div class="date-picker">
-          <label style="font-size: 14px; color: var(--text-muted); font-weight: 500;">Start Date:</label>
-          <input type="date" id="daily-start-date">
+      
+      <!-- SCOREBOARD SECTION -->
+      <div class="controls-bar glass" style="margin-bottom: 24px;">
+        <div style="flex: 1;">
+          <h2 style="margin: 0; font-size: 18px;">Profit/Loss Scoreboard</h2>
         </div>
-        <div class="date-picker">
-          <label style="font-size: 14px; color: var(--text-muted); font-weight: 500;">End Date:</label>
-          <input type="date" id="daily-end-date">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div>
+            <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Start Date</label>
+            <input type="date" id="scoreboard-start-date" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: white;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">End Date</label>
+            <input type="date" id="scoreboard-end-date" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: white;">
+          </div>
+          <button id="btn-calc-scoreboard" class="primary" style="align-self: flex-end; padding: 7px 16px;">Calculate</button>
         </div>
-        <button class="primary" id="btn-fetch-daily">Fetch Feed</button>
-        <span id="daily-last-updated" style="color:var(--text-muted); font-size:12px; margin-left:auto; font-weight:500;"></span>
       </div>
 
-      <div id="daily-scoreboard" class="card glass" style="margin-bottom: 24px; padding: 24px; display: none; background: rgba(5,5,5,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;">
+      <div id="daily-scoreboard" class="card glass" style="margin-bottom: 32px; padding: 24px; display: none; background: rgba(5,5,5,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>
             <h3 style="margin: 0; font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Cumulative Net Profit</h3>
@@ -455,25 +461,25 @@
         </div>
         
         <div id="scoreboard-breakdown" style="display: none; margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 24px; animation: fadeIn 0.3s ease;">
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
-            <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
-              <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total Revenue</div>
-              <div id="sb-revenue" style="font-size: 20px; font-weight: 700; color: white; margin-top: 4px;">₹0</div>
-            </div>
-            <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
-              <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Product Cost</div>
-              <div id="sb-cogs" style="font-size: 20px; font-weight: 700; color: #f87171; margin-top: 4px;">-₹0</div>
-            </div>
-            <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
-              <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Shipping & Logistics</div>
-              <div id="sb-shipping" style="font-size: 20px; font-weight: 700; color: #f87171; margin-top: 4px;">-₹0</div>
-            </div>
-            <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
-              <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total Ad Spend</div>
-              <div id="sb-ads" style="font-size: 20px; font-weight: 700; color: #f87171; margin-top: 4px;">-₹0</div>
-            </div>
+          <div id="scoreboard-breakdown-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto;">
+            <!-- Rendered by JS -->
           </div>
         </div>
+      </div>
+
+      <!-- DAILY FEED SECTION -->
+      <div class="controls-bar">
+        <h2 style="margin: 0; font-size: 18px; flex: 1;">Daily Feed</h2>
+        <div class="date-picker">
+          <label style="font-size: 14px; color: var(--text-muted); font-weight: 500;">Start Date:</label>
+          <input type="date" id="daily-start-date">
+        </div>
+        <div class="date-picker">
+          <label style="font-size: 14px; color: var(--text-muted); font-weight: 500;">End Date:</label>
+          <input type="date" id="daily-end-date">
+        </div>
+        <button class="primary" id="btn-fetch-daily">Fetch Feed</button>
+        <span id="daily-last-updated" style="color:var(--text-muted); font-size:12px; margin-left: 12px; font-weight:500;"></span>
       </div>
 
       <div id="daily-feed" class="daily-feed-container">
@@ -1249,6 +1255,14 @@
 
     function setupViewInputs() {
       const now = new Date();
+      if (!document.getElementById('scoreboard-start-date').value) {
+        let d = new Date(now);
+        d.setDate(d.getDate() - 6);
+        document.getElementById('scoreboard-start-date').value = toDateStr(d);
+      }
+      if (!document.getElementById('scoreboard-end-date').value) {
+        document.getElementById('scoreboard-end-date').value = toDateStr(now);
+      }
       if (!document.getElementById('daily-start-date').value) {
         let d = new Date(now);
         d.setDate(d.getDate() - 6);
@@ -1307,6 +1321,11 @@
       }
     }
 
+    document.getElementById('btn-calc-scoreboard').addEventListener('click', () => {
+      const sStart = document.getElementById('scoreboard-start-date').value;
+      const sEnd = document.getElementById('scoreboard-end-date').value;
+      if (sStart && sEnd) renderScoreboard(new Date(sStart), new Date(sEnd));
+    });
     document.getElementById('btn-fetch-daily').addEventListener('click', () => fetchCurrentView(true));
     document.getElementById('btn-fetch-weekly').addEventListener('click', () => fetchCurrentView(true));
     document.getElementById('btn-fetch-monthly').addEventListener('click', () => fetchCurrentView(true));
@@ -1819,7 +1838,12 @@
           renderSheet();
         }
         else if (state.view === 'products') renderProducts(minDate, maxDate);
-        else if (state.view === 'daily') renderDaily(new Date(minDate), new Date(maxDate));
+        else if (state.view === 'daily') {
+          renderDaily(new Date(minDate), new Date(maxDate));
+          const sStart = document.getElementById('scoreboard-start-date').value;
+          const sEnd = document.getElementById('scoreboard-end-date').value;
+          if (sStart && sEnd) renderScoreboard(new Date(sStart), new Date(sEnd));
+        }
         else if (state.view === 'weekly') renderWeekly(new Date(minDate), new Date(maxDate));
         else if (state.view === 'monthly') renderMonthly(new Date(minDate), new Date(maxDate));
         else if (state.view === 'all-time') renderAllTime(new Date(minDate), new Date(maxDate), 'all-time');
@@ -2349,18 +2373,80 @@
       return hash;
     };
 
+    function renderScoreboard(dStart, dEnd) {
+      let totalNet = 0;
+      let breakdownHtml = '';
+      
+      // Iterate over each day from newest to oldest
+      for (var d = new Date(dEnd); d >= dStart; d.setDate(d.getDate() - 1)) {
+        const dateStr = toDateStr(d);
+        const dayOrders = state.orders.filter(o => {
+          const oDate = new Date(o.created_at);
+          const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
+          return oIST.toISOString().startsWith(dateStr);
+        });
+        
+        const tagsCounts = categorizeOrders(dayOrders);
+        const revenue = getTotalRevenue(dayOrders);
+        const deliveredCount = tagsCounts['Delivered'] || 0;
+        const fulfilledCount = tagsCounts['Fulfilled'] || 0;
+        const adCost = state.adCosts[dateStr] || 0;
+        
+        const allDayItems = [];
+        dayOrders.forEach(o => {
+          const isDel = categorizeOrders([o])['Delivered'] > 0;
+          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
+          if (o.line_items) {
+            o.line_items.forEach(li => {
+              const lookupKey = li.sku || ('TITLE:' + li.title);
+              allDayItems.push({ ...li, sku: lookupKey, isDelivered: isDel, isFulfilled: isFul });
+            });
+          }
+        });
+
+        const totalShopifySales = dayOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
+        const pl = calcPL(revenue, deliveredCount, adCost, fulfilledCount, allDayItems, totalShopifySales);
+
+        totalNet += pl.profit;
+        
+        // Build breakdown row
+        if (dayOrders.length > 0 || pl.profit !== 0) {
+          const prettyDate = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+          const profitText = pl.profit >= 0 ? `net profit is ${fmt(pl.profit)}` : `net loss is ${fmt(Math.abs(pl.profit))}`;
+          const colorClass = pl.profit >= 0 ? 'var(--profit-color)' : 'var(--loss-color)';
+          
+          breakdownHtml += `
+            <div style="display: flex; justify-content: space-between; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+              <span style="color: var(--text-main); font-weight: 500;">${prettyDate}</span>
+              <span style="color: ${colorClass}; font-weight: 700;">${profitText}</span>
+            </div>
+          `;
+        }
+      }
+
+      document.getElementById('daily-scoreboard').style.display = 'block';
+      const netColor = totalNet >= 0 ? 'var(--profit-color)' : 'var(--loss-color)';
+      const profitEl = document.getElementById('scoreboard-net-profit');
+      profitEl.textContent = fmtK(totalNet);
+      profitEl.style.color = netColor;
+      profitEl.style.textShadow = totalNet >= 0 ? '0 0 20px rgba(52, 211, 153, 0.4)' : '0 0 20px rgba(248, 113, 113, 0.4)';
+
+      document.getElementById('scoreboard-date-range').textContent = `${new Date(dStart).toLocaleDateString()} to ${new Date(dEnd).toLocaleDateString()}`;
+      
+      const breakdownList = document.getElementById('scoreboard-breakdown-list');
+      if (breakdownHtml === '') {
+        breakdownList.innerHTML = '<div style="color: var(--text-muted); padding: 12px; text-align: center;">No data for this date range</div>';
+      } else {
+        breakdownList.innerHTML = breakdownHtml;
+      }
+    }
+
     // RENDERING: DAILY
     function renderDaily(dStart, dEnd) {
       document.getElementById('daily-last-updated').textContent = `Loaded at ${new Date().toLocaleTimeString()}`;
       
       const feedContainer = document.getElementById('daily-feed');
       feedContainer.innerHTML = ''; // clear
-
-      let totalRev = 0;
-      let totalCogs = 0;
-      let totalShip = 0;
-      let totalAds = 0;
-      let totalNet = 0;
 
       // To iterate newest to oldest
       const dayBlocks = [];
@@ -2393,12 +2479,6 @@
 
         const totalShopifySales = dayOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
         const pl = calcPL(revenue, deliveredCount, adCost, fulfilledCount, allDayItems, totalShopifySales);
-
-        totalRev += pl.revenue;
-        totalCogs += pl.productCost;
-        totalShip += pl.shippingCost;
-        totalAds += pl.adCost;
-        totalNet += pl.profit;
 
         const prettyDate = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
@@ -2556,21 +2636,6 @@
       
       if(dayBlocks.length === 0) {
         feedContainer.innerHTML = '<div class="empty-state">No days selected or invalid date range.</div>';
-        document.getElementById('daily-scoreboard').style.display = 'none';
-      } else {
-        document.getElementById('daily-scoreboard').style.display = 'block';
-        const netColor = totalNet >= 0 ? 'var(--profit-color)' : 'var(--loss-color)';
-        const profitEl = document.getElementById('scoreboard-net-profit');
-        profitEl.textContent = fmtK(totalNet);
-        profitEl.style.color = netColor;
-        profitEl.style.textShadow = totalNet >= 0 ? '0 0 20px rgba(52, 211, 153, 0.4)' : '0 0 20px rgba(248, 113, 113, 0.4)';
-
-        document.getElementById('scoreboard-date-range').textContent = `${new Date(dStart).toLocaleDateString()} to ${new Date(dEnd).toLocaleDateString()}`;
-
-        document.getElementById('sb-revenue').textContent = fmtK(totalRev);
-        document.getElementById('sb-cogs').textContent = '-' + fmtK(totalCogs);
-        document.getElementById('sb-shipping').textContent = '-' + fmtK(totalShip);
-        document.getElementById('sb-ads').textContent = '-' + fmtK(totalAds);
       }
     }
 
