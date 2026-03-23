@@ -303,7 +303,6 @@
       <div class="tab" data-target="weekly">Weekly</div>
       <div class="tab" data-target="monthly">Monthly</div>
       <div class="tab" data-target="all-time">All Time</div>
-      <div class="tab" data-target="analytics">Business Analytics</div>
     </div>
 
     <!-- SHEET VIEW (New Spreadsheet Style) -->
@@ -427,49 +426,7 @@
 
     <!-- DAILY VIEW (Scrollable Feed) -->
     <div id="view-daily" class="view-content">
-      
-      <!-- SCOREBOARD SECTION -->
-      <div class="controls-bar glass" style="margin-bottom: 24px;">
-        <div style="flex: 1;">
-          <h2 style="margin: 0; font-size: 18px;">Profit/Loss Scoreboard</h2>
-        </div>
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <div>
-            <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Start Date</label>
-            <input type="date" id="scoreboard-start-date" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: white;">
-          </div>
-          <div>
-            <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">End Date</label>
-            <input type="date" id="scoreboard-end-date" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: white;">
-          </div>
-          <button id="btn-calc-scoreboard" class="primary" style="align-self: flex-end; padding: 7px 16px;">Calculate</button>
-        </div>
-      </div>
-
-      <div id="daily-scoreboard" class="card glass" style="margin-bottom: 32px; padding: 24px; display: none; background: rgba(5,5,5,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <h3 style="margin: 0; font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Cumulative Net Profit</h3>
-            <div id="scoreboard-net-profit" style="font-size: 36px; font-weight: 700; margin-top: 8px;">₹0</div>
-            <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="scoreboard-date-range">...</div>
-          </div>
-          <div style="text-align: right;">
-            <button id="btn-toggle-breakdown" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border); padding: 8px 16px; border-radius: 8px; color: white; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;">
-              View Breakdown <span id="breakdown-icon">▼</span>
-            </button>
-          </div>
-        </div>
-        
-        <div id="scoreboard-breakdown" style="display: none; margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 24px; animation: fadeIn 0.3s ease;">
-          <div id="scoreboard-breakdown-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto;">
-            <!-- Rendered by JS -->
-          </div>
-        </div>
-      </div>
-
-      <!-- DAILY FEED SECTION -->
       <div class="controls-bar">
-        <h2 style="margin: 0; font-size: 18px; flex: 1;">Daily Feed</h2>
         <div class="date-picker">
           <label style="font-size: 14px; color: var(--text-muted); font-weight: 500;">Start Date:</label>
           <input type="date" id="daily-start-date">
@@ -479,7 +436,7 @@
           <input type="date" id="daily-end-date">
         </div>
         <button class="primary" id="btn-fetch-daily">Fetch Feed</button>
-        <span id="daily-last-updated" style="color:var(--text-muted); font-size:12px; margin-left: 12px; font-weight:500;"></span>
+        <span id="daily-last-updated" style="color:var(--text-muted); font-size:12px; margin-left:auto; font-weight:500;"></span>
       </div>
 
       <div id="daily-feed" class="daily-feed-container">
@@ -641,48 +598,6 @@
 
   </div>
 
-  <!-- BUSINESS ANALYTICS VIEW -->
-  <div id="view-analytics" class="view-content">
-    <div class="controls-bar glass">
-      <div style="flex: 1;">
-        <h2 style="margin: 0; font-size: 20px;">Business Analytics Overview</h2>
-        <p style="margin: 4px 0 0 0; color: var(--text-muted); font-size: 14px;" id="analytics-range">Select a date range</p>
-      </div>
-      <div style="display: flex; align-items: center; gap: 15px;">
-        <div style="display: flex; gap: 6px; margin-right: 10px;">
-          <button class="btn-preset" onclick="setAnalyticsPreset('today')" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-muted); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; transition: 0.2s;">Today</button>
-          <button class="btn-preset" onclick="setAnalyticsPreset('7d')" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-muted); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; transition: 0.2s;">7 Days</button>
-          <button class="btn-preset" onclick="setAnalyticsPreset('30d')" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-muted); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; transition: 0.2s;">30 Days</button>
-          <button class="btn-preset" onclick="setAnalyticsPreset('month')" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-muted); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; transition: 0.2s;">This Month</button>
-        </div>
-        <div>
-          <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">From</label>
-          <input type="date" id="analytics-start-date" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-hover); color: var(--text-color);">
-        </div>
-        <div>
-          <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">To</label>
-          <input type="date" id="analytics-end-date" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-hover); color: var(--text-color);">
-        </div>
-        <button id="btn-fetch-analytics" class="primary" style="align-self: flex-end; padding: 7px 16px;">Fetch Data</button>
-      </div>
-    </div>
-
-    <div class="metrics-grid" id="analytics-metrics">
-      <div class="metric-card"><div class="metric-label">Delivery Rate</div><div class="metric-value text-profit" id="analytics-delivery-rate">0%</div></div>
-      <div class="metric-card"><div class="metric-label">RTO Rate</div><div class="metric-value text-loss" id="analytics-rto-rate">0%</div></div>
-      <div class="metric-card"><div class="metric-label">Cancellation Rate</div><div class="metric-value text-loss" id="analytics-cancel-rate">0%</div></div>
-    </div>
-
-    <div class="main-grid" style="grid-template-columns: 1fr;">
-      <div class="card glass">
-        <h3>Order Status Distribution</h3>
-        <div style="position:relative; width:100%; height:320px; display: flex; justify-content: center;">
-          <canvas id="analyticsPieChart"></canvas>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Loading Overlay -->
   <div class="loading-overlay" id="loading">
     <div class="spinner"></div>
@@ -753,19 +668,16 @@
     const PRODUCT_COST = 555;
     const SHIPPING_COST = 135;
     const STORE_LAUNCH_DATE = '2026-02-01'; // User can adjust this if needed
-    const STATUS_TAGS = ['Delivered','Canceled','Attempted Delivery','In Transit','Out for Delivery','Failed Delivery','Paid','Payment Pending','Unfulfilled','Fulfilled','RTO','Unreachable'];
+    const STATUS_TAGS = ['Delivered','Canceled','Attempted Delivery','In Transit','Paid','Payment Pending','Unfulfilled','Fulfilled'];
     const CHART_COLORS = {
       'Delivered': '#34d399',
       'Canceled': '#f87171',
       'Attempted Delivery': '#fbbf24',
       'In Transit': '#60a5fa',
-      'Out for Delivery': '#a78bfa',
-      'Failed Delivery': '#f97316',
       'Paid': '#34d399',
       'Payment Pending': '#fbbf24',
       'Unfulfilled': '#f87171',
       'Fulfilled': '#34d399',
-      'RTO': '#ef4444',
       'Other': '#52525b'
     };
     // CORE STATE
@@ -1017,17 +929,6 @@
     // Setup Listeners
     document.addEventListener('DOMContentLoaded', () => {
       checkAuth();
-      document.getElementById('btn-toggle-breakdown')?.addEventListener('click', () => {
-        const breakdown = document.getElementById('scoreboard-breakdown');
-        const icon = document.getElementById('breakdown-icon');
-        if(breakdown.style.display === 'none') {
-          breakdown.style.display = 'block';
-          icon.textContent = '▲';
-        } else {
-          breakdown.style.display = 'none';
-          icon.textContent = '▼';
-        }
-      });
       document.getElementById('btn-login')?.addEventListener('click', handleLogin);
       document.getElementById('passcode-input')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
       document.getElementById('btn-intel-toggle')?.addEventListener('click', () => {
@@ -1165,7 +1066,7 @@
       return start;
     }
     function fmt(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
-    function fmtK(n) { return fmt(n); }
+    function fmtK(n) { return n >= 1000 ? '₹' + (n / 1000).toFixed(1) + 'K' : '₹' + Math.round(n); }
     function getTagClass(t) {
       return 'tag-' + t.toLowerCase().replace(/\s+/g, '-');
     }
@@ -1255,14 +1156,6 @@
 
     function setupViewInputs() {
       const now = new Date();
-      if (!document.getElementById('scoreboard-start-date').value) {
-        let d = new Date(now);
-        d.setDate(d.getDate() - 6);
-        document.getElementById('scoreboard-start-date').value = toDateStr(d);
-      }
-      if (!document.getElementById('scoreboard-end-date').value) {
-        document.getElementById('scoreboard-end-date').value = toDateStr(now);
-      }
       if (!document.getElementById('daily-start-date').value) {
         let d = new Date(now);
         d.setDate(d.getDate() - 6);
@@ -1297,16 +1190,6 @@
       if (!document.getElementById('all-time-to').value) {
         document.getElementById('all-time-to').value = toDateStr(now);
       }
-      
-      // Analytics: Default to last 30 days
-      if (!document.getElementById('analytics-start-date').value) {
-        let d = new Date(now);
-        d.setDate(d.getDate() - 30);
-        document.getElementById('analytics-start-date').value = toDateStr(d);
-      }
-      if (!document.getElementById('analytics-end-date').value) {
-        document.getElementById('analytics-end-date').value = toDateStr(now);
-      }
 
       // Populate months and years exactly once
       const mSel = document.getElementById('monthly-month');
@@ -1321,58 +1204,10 @@
       }
     }
 
-    document.getElementById('btn-calc-scoreboard').addEventListener('click', async () => {
-      const sStart = document.getElementById('scoreboard-start-date').value;
-      const sEnd = document.getElementById('scoreboard-end-date').value;
-      if (sStart && sEnd) {
-        showLoading('Calculating Scoreboard...');
-        try {
-          const minDate = new Date(sStart + 'T00:00:00+05:30').toISOString();
-          const maxDate = new Date(sEnd + 'T23:59:59+05:30').toISOString();
-          
-          if (sbClient) {
-            await syncShopifyToSupabase(minDate, maxDate, false);
-            const sbOrders = await fetchOrdersFromSupabase(minDate, maxDate);
-            
-            const sbAdCosts = {};
-            const { data } = await sbClient.from('ad_costs').select('date, amount').gte('date', sStart).lte('date', sEnd);
-            if (data) data.forEach(r => sbAdCosts[r.date] = r.amount);
-            
-            renderScoreboard(new Date(sStart), new Date(sEnd), sbOrders, sbAdCosts);
-          } else {
-            renderScoreboard(new Date(sStart), new Date(sEnd));
-          }
-        } catch (e) {
-          console.error(e);
-          log("Scoreboard calc failed: " + e.message);
-        }
-        hideLoading();
-      }
-    });
     document.getElementById('btn-fetch-daily').addEventListener('click', () => fetchCurrentView(true));
     document.getElementById('btn-fetch-weekly').addEventListener('click', () => fetchCurrentView(true));
     document.getElementById('btn-fetch-monthly').addEventListener('click', () => fetchCurrentView(true));
-    document.getElementById('btn-apply-all-time')?.addEventListener('click', () => fetchCurrentView(true));
-    document.getElementById('btn-fetch-analytics')?.addEventListener('click', () => fetchCurrentView(true));
-
-    window.setAnalyticsPreset = function(preset) {
-      const now = new Date();
-      let start = new Date(now);
-      let end = new Date(now);
-      if (preset === 'today') {
-        // start and end are already today
-      } else if (preset === '7d') {
-        start.setDate(now.getDate() - 7);
-      } else if (preset === '30d') {
-        start.setDate(now.getDate() - 30);
-      } else if (preset === 'month') {
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-      }
-      document.getElementById('analytics-start-date').value = toDateStr(start);
-      document.getElementById('analytics-end-date').value = toDateStr(end);
-      fetchCurrentView(true);
-    };
-
+    document.getElementById('btn-apply-all-time').addEventListener('click', () => fetchCurrentView(true));
     function showLoading(msg) {
       document.getElementById('loading').classList.add('active');
       document.getElementById('loading-msg').textContent = msg || '';
@@ -1388,105 +1223,41 @@
       counts['Other'] = 0;
 
       orders.forEach(o => {
-        const rawTags = (o.tags || '').split(',').map(t => t.trim().toLowerCase());
+        const tags = (o.tags || '').split(',').map(t => t.trim().toLowerCase());
         const fs = (o.fulfillment_status || '').toLowerCase();
         const fin = (o.financial_status || '').toLowerCase();
+        let matched = false;
 
-        // Extract synthetic shipment_status tag (stored as '__ss:<value>' during sync)
-        // Shopify shipment_status values: in_transit, out_for_delivery, delivered, failure,
-        // attempted_delivery, label_printed, label_purchased, ready_for_pickup
-        const syntheticSS = rawTags.find(t => t.startsWith('__ss:'));
-        const shipmentStatus = syntheticSS ? syntheticSS.replace('__ss:', '') : '';
+        // Check custom tags first (exact STATUS_TAGS match)
+        STATUS_TAGS.forEach(st => {
+          if (tags.includes(st.toLowerCase())) { counts[st]++; matched = true; }
+        });
 
-        // --- Detect delivery state ---
+        // Fallback: Shopify fulfillment/financial status
+        if (!matched) {
+          if (fs === 'fulfilled' || fs === 'partial') {
+            counts['Fulfilled']++; matched = true;
+          } else if (fin === 'voided' || fin === 'refunded' ||
+                     tags.some(t => t === 'cancelled' || t === 'canceled') ||
+                     o.cancelled_at) {
+            counts['Canceled']++; matched = true;
+          } else if (fs === null || fs === '' || fs === 'unfulfilled') {
+            counts['Unfulfilled']++; matched = true;
+          }
+        }
 
-        // RTO: Shiprocket tag containing 'rto'
-        const isRTO = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto'));
-
-        // Unreachable: Shiprocket tag containing 'unreachable'
-        const isUnreachable = rawTags.some(t => !t.startsWith('__ss:') && t.includes('unreachable'));
-
-        // Delivered: strictly synchronized with revenue calculation
-        const isDelivered = isOrderDelivered(o);
-
-        // Fulfilled: Shopify says order has been shipped out OR it is delivered
-        const isFulfilled = (fs === 'fulfilled' || fs === 'partial') || isDelivered;
-
-        // Shipment status signals (from synthetic tag OR plain Shiprocket text tags)
-        const ssInTransit     = shipmentStatus === 'in_transit'    || rawTags.some(t => t.includes('in transit') && !t.startsWith('__ss:'));
-        const ssOutForDel     = shipmentStatus === 'out_for_delivery' || rawTags.some(t => t.includes('out for delivery') && !t.startsWith('__ss:'));
-        const ssFailure       = shipmentStatus === 'failure'        || shipmentStatus === 'attempted_delivery'
-                                || rawTags.some(t => (t.includes('failed delivery') || t.includes('attempted delivery')) && !t.startsWith('__ss:'));
-        const ssDelivered     = shipmentStatus === 'delivered'      || rawTags.some(t => t === 'delivered' && !t.startsWith('__ss:'));
-
-        // In Transit: package is en route
-        const isInTransit = ssInTransit && !ssOutForDel && !ssFailure && !ssDelivered && !isRTO;
-
-        // Out for Delivery
-        const isOutForDelivery = ssOutForDel && !ssFailure && !ssDelivered && !isRTO;
-
-        // Failed Delivery (delivery attempted but failed, not RTO)
-        const isFailedDelivery = ssFailure && !isRTO;
-
-        // Cancelled
-        const isCanceled = rawTags.some(t => t === 'canceled' || t === 'cancelled') ||
-                           fin === 'voided' || fin === 'refunded' || !!o.cancelled_at;
-
-        // Unfulfilled fallback
-        const isUnfulfilled = !isFulfilled && !isCanceled &&
-                              (fs === '' || fs === 'unfulfilled' || !fs);
-
-        // Apply counts
-        if (isFulfilled)       counts['Fulfilled']++;
-        if (isDelivered)       counts['Delivered']++;
-        if (isRTO)             counts['RTO']++;
-        if (isUnreachable)     counts['Unreachable']++;
-        if (isInTransit)       counts['In Transit']++;
-        if (isOutForDelivery)  counts['Out for Delivery']++;
-        if (isFailedDelivery)  counts['Failed Delivery']++;
-        if (isCanceled)        counts['Canceled']++;
-        if (isUnfulfilled)     counts['Unfulfilled']++;
-
-        const anyMatched = isFulfilled || isDelivered || isRTO || isUnreachable || isInTransit ||
-                           isOutForDelivery || isFailedDelivery || isCanceled || isUnfulfilled;
-        if (!anyMatched) counts['Other']++;
+        if (!matched) counts['Other']++;
       });
       return counts;
     }
 
-    function isOrderDelivered(o) {
-      const rawTags = (o.tags || '').split(',').map(t => t.trim().toLowerCase());
-      const fs = (o.fulfillment_status || '').toLowerCase();
-
-      const syntheticSS = rawTags.find(t => t.startsWith('__ss:'));
-      const shipmentStatus = syntheticSS ? syntheticSS.replace('__ss:', '') : '';
-
-      const isRTO = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto'));
-      
-      const ssDelivered = shipmentStatus === 'delivered' || rawTags.some(t => t === 'delivered' && !t.startsWith('__ss:'));
-
-      return !isRTO && ssDelivered;
-    }
-
     function getTotalRevenue(orders) {
-      // Revenue only from truly delivered orders
       return orders
-        .filter(isOrderDelivered)
-        .reduce((sum, o) => {
-          // If perfectly fulfilled, use total order value (includes discounts properly)
-          if (o.fulfillment_status === 'fulfilled') {
-            return sum + parseFloat(o.total_price || 0);
-          }
-          // If partially fulfilled, only sum up the completed items
-          if (o.fulfillment_status === 'partial' && o.line_items && o.line_items.length > 0) {
-            const fulfilledItems = o.line_items.filter(li => li.fulfillment_status === 'fulfilled');
-            if (fulfilledItems.length > 0) {
-              return sum + fulfilledItems.reduce((s, li) => s + (parseFloat(li.price || 0) * parseInt(li.quantity || 1)), 0);
-            }
-          }
-          // Fallback (e.g. unfulfilled state or old data missing fulfillment_status)
-          return sum + parseFloat(o.total_price || 0);
-        }, 0);
+        .filter(o => {
+          const tags = (o.tags || '').toLowerCase().split(',').map(t => t.trim());
+          return tags.includes('delivered');
+        })
+        .reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
     }
 
     function calcPL(revenue, deliveredCount, adCost, fulfilledCount = 0, items = [], totalShopifyRevenue = 0) {
@@ -1591,27 +1362,12 @@
             log(`Saving ${data.orders.length} orders to Database...`);
             
             const ordersToInsert = data.orders.map(o => {
-              // Extract the latest shipment_status from Shopify fulfillments
-              // Shopify stores: in_transit, out_for_delivery, delivered, failure, attempted_delivery, label_printed etc.
-              const shipmentStatus = o.fulfillments && o.fulfillments.length > 0
-                ? (o.fulfillments[o.fulfillments.length - 1].shipment_status || '')
-                : '';
-              
-              // Encode shipment_status as a synthetic tag prefix so it's stored alongside real tags
-              // WITHOUT needing a schema change. Prefix: '__ss:' (shipment status)
-              let tagsWithStatus = o.tags || '';
-              // Remove any old __ss: synthetic tag first to avoid duplication on re-sync
-              tagsWithStatus = tagsWithStatus.split(',').filter(t => !t.trim().startsWith('__ss:')).join(',');
-              if (shipmentStatus) {
-                tagsWithStatus = tagsWithStatus ? `${tagsWithStatus},__ss:${shipmentStatus}` : `__ss:${shipmentStatus}`;
-              }
-
               const row = {
                 id: o.id,
                 name: o.name,
                 created_at: o.created_at,
                 total_price: o.total_price,
-                tags: tagsWithStatus,
+                tags: o.tags,
                 customer_fn: o.customer ? o.customer.first_name : null,
                 customer_ln: o.customer ? o.customer.last_name : null
               };
@@ -1636,7 +1392,7 @@
             data.orders.forEach(o => {
               if (o.line_items) {
                 o.line_items.forEach(li => {
-                  const row = {
+                  lineItems.push({
                     id: li.id,
                     order_id: o.id,
                     product_id: li.product_id,
@@ -1645,9 +1401,7 @@
                     quantity: li.quantity,
                     price: li.price,
                     sku: li.sku
-                  };
-                  if (li.fulfillment_status) row.fulfillment_status = li.fulfillment_status;
-                  lineItems.push(row);
+                  });
                 });
               }
             });
@@ -1816,13 +1570,6 @@
           }
           minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
           maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
-        } else if (state.view === 'analytics') {
-          dbMin = document.getElementById('analytics-start-date').value;
-          dbMax = document.getElementById('analytics-end-date').value;
-          if (dbMin && dbMax) {
-            minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
-            maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
-          }
         }
 
         if (!dbMin || !dbMax) {
@@ -1861,16 +1608,10 @@
           renderSheet();
         }
         else if (state.view === 'products') renderProducts(minDate, maxDate);
-        else if (state.view === 'daily') {
-          renderDaily(new Date(minDate), new Date(maxDate));
-          const sStart = document.getElementById('scoreboard-start-date').value;
-          const sEnd = document.getElementById('scoreboard-end-date').value;
-          if (sStart && sEnd) renderScoreboard(new Date(sStart), new Date(sEnd));
-        }
+        else if (state.view === 'daily') renderDaily(new Date(minDate), new Date(maxDate));
         else if (state.view === 'weekly') renderWeekly(new Date(minDate), new Date(maxDate));
         else if (state.view === 'monthly') renderMonthly(new Date(minDate), new Date(maxDate));
         else if (state.view === 'all-time') renderAllTime(new Date(minDate), new Date(maxDate), 'all-time');
-        else if (state.view === 'analytics') renderAnalytics(minDate, maxDate);
         
         // Auto-update Intelligence if open
         if (document.getElementById('intel-drawer').classList.contains('active')) {
@@ -2396,74 +2137,6 @@
       return hash;
     };
 
-    function renderScoreboard(dStart, dEnd, orders = state.orders, adCostsMap = state.adCosts) {
-      let totalNet = 0;
-      let breakdownHtml = '';
-      
-      // Iterate over each day from newest to oldest
-      for (var d = new Date(dEnd); d >= dStart; d.setDate(d.getDate() - 1)) {
-        const dateStr = toDateStr(d);
-        const dayOrders = orders.filter(o => {
-          const oDate = new Date(o.created_at);
-          const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
-          return oIST.toISOString().startsWith(dateStr);
-        });
-        
-        const tagsCounts = categorizeOrders(dayOrders);
-        const revenue = getTotalRevenue(dayOrders);
-        const deliveredCount = tagsCounts['Delivered'] || 0;
-        const fulfilledCount = tagsCounts['Fulfilled'] || 0;
-        const adCost = adCostsMap[dateStr] || 0;
-        
-        const allDayItems = [];
-        dayOrders.forEach(o => {
-          const isDel = categorizeOrders([o])['Delivered'] > 0;
-          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
-          if (o.line_items) {
-            o.line_items.forEach(li => {
-              const lookupKey = li.sku || ('TITLE:' + li.title);
-              allDayItems.push({ ...li, sku: lookupKey, isDelivered: isDel, isFulfilled: isFul });
-            });
-          }
-        });
-
-        const totalShopifySales = dayOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
-        const pl = calcPL(revenue, deliveredCount, adCost, fulfilledCount, allDayItems, totalShopifySales);
-
-        totalNet += pl.profit;
-        
-        // Build breakdown row
-        if (dayOrders.length > 0 || pl.profit !== 0) {
-          const prettyDate = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
-          const profitText = pl.profit >= 0 ? `net profit is ${fmt(pl.profit)}` : `net loss is ${fmt(Math.abs(pl.profit))}`;
-          const colorClass = pl.profit >= 0 ? 'var(--profit-color)' : 'var(--loss-color)';
-          
-          breakdownHtml += `
-            <div style="display: flex; justify-content: space-between; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
-              <span style="color: var(--text-main); font-weight: 500;">${prettyDate}</span>
-              <span style="color: ${colorClass}; font-weight: 700;">${profitText}</span>
-            </div>
-          `;
-        }
-      }
-
-      document.getElementById('daily-scoreboard').style.display = 'block';
-      const netColor = totalNet >= 0 ? 'var(--profit-color)' : 'var(--loss-color)';
-      const profitEl = document.getElementById('scoreboard-net-profit');
-      profitEl.textContent = fmtK(totalNet);
-      profitEl.style.color = netColor;
-      profitEl.style.textShadow = totalNet >= 0 ? '0 0 20px rgba(52, 211, 153, 0.4)' : '0 0 20px rgba(248, 113, 113, 0.4)';
-
-      document.getElementById('scoreboard-date-range').textContent = `${new Date(dStart).toLocaleDateString()} to ${new Date(dEnd).toLocaleDateString()}`;
-      
-      const breakdownList = document.getElementById('scoreboard-breakdown-list');
-      if (breakdownHtml === '') {
-        breakdownList.innerHTML = '<div style="color: var(--text-muted); padding: 12px; text-align: center;">No data for this date range</div>';
-      } else {
-        breakdownList.innerHTML = breakdownHtml;
-      }
-    }
-
     // RENDERING: DAILY
     function renderDaily(dStart, dEnd) {
       document.getElementById('daily-last-updated').textContent = `Loaded at ${new Date().toLocaleTimeString()}`;
@@ -2484,7 +2157,7 @@
         const tagsCounts = categorizeOrders(dayOrders);
         const revenue = getTotalRevenue(dayOrders);
         const deliveredCount = tagsCounts['Delivered'] || 0;
-        const fulfilledCount = tagsCounts['Fulfilled'] || 0;
+        const fulfilledCount = (tagsCounts['Fulfilled'] || 0) + deliveredCount;
         const adCost = state.adCosts[dateStr] || 0;
         
         // Collect all items for the day to calculate accurate P&L
@@ -2516,59 +2189,13 @@
           const fn = (o.customer && o.customer.first_name) || '';
           const ln = (o.customer && o.customer.last_name) || '';
           const time = o.created_at ? new Date(o.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
-          let itemsHtml = '';
-          if (o.line_items && o.line_items.length > 0) {
-            const isOrderDeliv = isOrderDelivered(o);
-            itemsHtml = '<div style="margin-top: 12px; font-size: 13px; color: var(--text-muted); background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px;">';
-            
-            o.line_items.forEach(li => {
-              const isItemFulfilled = li.fulfillment_status === 'fulfilled';
-              let revAdded = 0;
-              let statusText = '';
-              let statusColor = 'var(--text-muted)';
-              
-              if (o.fulfillment_status === 'fulfilled') {
-                revAdded = parseFloat(li.price) * li.quantity;
-                statusText = isOrderDeliv ? '✓ Delivered' : 'Fulfilled';
-                statusColor = isOrderDeliv ? 'var(--profit-color)' : 'var(--text-muted)';
-              } else if (o.fulfillment_status === 'partial') {
-                if (isItemFulfilled) {
-                  revAdded = parseFloat(li.price) * li.quantity;
-                  statusText = isOrderDeliv ? '✓ Delivered' : 'Fulfilled';
-                  statusColor = isOrderDeliv ? 'var(--profit-color)' : 'var(--text-muted)';
-                } else {
-                  statusText = '✗ Undelivered';
-                  statusColor = 'var(--loss-color)';
-                }
-              } else {
-                const fsStr = (o.fulfillment_status || 'Unfulfilled');
-                statusText = fsStr.charAt(0).toUpperCase() + fsStr.slice(1);
-              }
-              
-              const showRev = isOrderDeliv && revAdded > 0;
-              const revHtml = showRev ? `<span style="color:var(--profit-color)">+${fmt(revAdded)}</span>` : `<span style="opacity: 0.5">-</span>`;
-              
-              itemsHtml += `
-                <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;">
-                  <span style="flex:1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 12px;">${li.quantity}x ${li.title}</span>
-                  <span style="width: 100px; text-align: left; color: ${statusColor}">${statusText}</span>
-                  <span style="width: 80px; text-align: right; font-family: monospace;">${revHtml}</span>
-                </div>
-              `;
-            });
-            itemsHtml += '</div>';
-          }
-
           return `
             <tr>
-              <td style="vertical-align: top; padding-top: 16px;">
-                <div style="font-weight: 500">${o.name}</div>
-                ${itemsHtml}
-              </td>
-              <td style="vertical-align: top; padding-top: 16px;">${fn} ${ln}</td>
-              <td style="vertical-align: top; padding-top: 16px;">${fmt(o.total_price)}</td>
-              <td style="vertical-align: top; padding-top: 16px;"><div class="order-tags">${tRender}</div></td>
-              <td style="vertical-align: top; padding-top: 16px;">${time}</td>
+              <td>${o.name}</td>
+              <td>${fn} ${ln}</td>
+              <td>${fmt(o.total_price)}</td>
+              <td><div class="order-tags">${tRender}</div></td>
+              <td>${time}</td>
             </tr>
           `;
         }).join('');
@@ -2583,20 +2210,14 @@
           <div class="day-header">
             <h2>${prettyDate}</h2>
             <div class="day-actions">
-              <span class="badge" style="font-size: 14px; background: ${pl.profit >= 0 ? 'rgba(52, 211, 153, 0.2)' : 'rgba(248, 113, 113, 0.2)'}; color: ${pl.profit >= 0 ? 'var(--profit-color)' : 'var(--loss-color)'}; border: 1px solid ${pl.profit >= 0 ? 'var(--profit-color)' : 'var(--loss-color)'};">Net: ${profitChar}${fmt(Math.abs(pl.profit))}</span>
+              <span class="badge live" style="font-size: 14px;">Net: ${profitChar}${fmt(Math.abs(pl.profit))}</span>
             </div>
           </div>
 
           <div class="metrics-grid" style="margin-bottom: 24px;">
             <div class="metric-card"><div class="metric-label">Orders</div><div class="metric-value">${dayOrders.length}</div></div>
-            <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${tagsCounts['Fulfilled'] || 0}</div></div>
+            <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--primary)">${fulfilledCount}</div></div>
             <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${deliveredCount}</div></div>
-            <div class="metric-card"><div class="metric-label">In Transit</div><div class="metric-value" style="color:#60a5fa">${tagsCounts['In Transit'] || 0}</div></div>
-            <div class="metric-card"><div class="metric-label">Out for Delivery</div><div class="metric-value" style="color:#a78bfa">${tagsCounts['Out for Delivery'] || 0}</div></div>
-            <div class="metric-card"><div class="metric-label">Failed Delivery</div><div class="metric-value" style="color:#f97316">${tagsCounts['Failed Delivery'] || 0}</div></div>
-            <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${tagsCounts['Canceled'] || 0}</div></div>
-            <div class="metric-card"><div class="metric-label">RTO</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>
-            <div class="metric-card"><div class="metric-label">Unreachable</div><div class="metric-value" style="color:#facc15">${tagsCounts['Unreachable'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
             <div class="metric-card">
               <div class="metric-label">Ad Spend</div>
@@ -2703,7 +2324,7 @@
         totalOrders += dOrders.length;
         totalRevenue += dRev;
         totalDelivered += dDel;
-        totalFulfilled += dFul;
+        totalFulfilled += (dFul + dDel);
         totalAdCost += dAd;
 
         daysData.push({
@@ -2725,7 +2346,7 @@
 
       document.getElementById('weekly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
-        <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
+        <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--primary)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${wRet.repeatRate}%</div></div>
         <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
@@ -2804,7 +2425,7 @@
         totalOrders += dOrders.length;
         totalRevenue += dRev;
         totalDelivered += dDel;
-        totalFulfilled += dFul;
+        totalFulfilled += (dFul + dDel);
         totalCanceled += tCounts['Canceled'] || 0;
         totalTransit += tCounts['In Transit'] || 0;
         totalAdCost += dAd;
@@ -2816,12 +2437,11 @@
 
       document.getElementById('monthly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
-        <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
+        <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--primary)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${mRet.repeatRate}%</div></div>
         <div class="metric-card"><div class="metric-label">In Transit</div><div class="metric-value" style="color:var(--primary)">${totalTransit}</div></div>
         <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${totalCanceled}</div></div>
-        <div class="metric-card"><div class="metric-label">RTO</div><div class="metric-value text-loss">${totalRTO}</div></div>
         <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
         <div class="metric-card">
           <div class="metric-label">Ad Spend</div>
@@ -2932,7 +2552,7 @@
       let totalRevenue = getTotalRevenue(currentOrders);
       let tCounts = categorizeOrders(currentOrders);
       let totalDelivered = tCounts['Delivered'] || 0;
-      let totalFulfilled = tCounts['Fulfilled'] || 0;
+      let totalFulfilled = (tCounts['Fulfilled'] || 0) + totalDelivered;
       let totalCanceled = tCounts['Canceled'] || 0;
       let totalTransit = tCounts['In Transit'] || 0;
       
@@ -2952,7 +2572,7 @@
 
       document.getElementById(`${prefix}-metrics`).innerHTML = `
         <div class="metric-card"><div class="metric-label">${titleOverride} Orders</div><div class="metric-value">${totalOrders}</div></div>
-        <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
+        <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--primary)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${atRet.repeatRate}%</div></div>
         <div class="metric-card"><div class="metric-label">${titleOverride} Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
@@ -3166,136 +2786,6 @@
       }).join('');
 
       renderPLTable(prefix, atPL, totalDelivered);
-    }
-
-    function renderAnalytics(minDateStr, maxDateStr) {
-      document.getElementById('analytics-range').textContent = `${new Date(minDateStr).toLocaleDateString()} to ${new Date(maxDateStr).toLocaleDateString()}`;
-      
-      const currentOrders = state.orders; // Filtered by the fetch step
-      
-      // Calculate Rates
-      const counts = categorizeOrders(currentOrders);
-      
-      const delivered = counts['Delivered'] || 0;
-      const rto = counts['RTO'] || 0;
-      const failed = counts['Failed Delivery'] || 0;
-      const canceled = counts['Canceled'] || 0;
-      const inTransit = counts['In Transit'] || 0;
-      const totalOrders = currentOrders.length;
-      
-      // Shipped = Delivered + RTO + Failed + In Transit
-      const totalShipped = delivered + rto + failed + inTransit;
-      
-      const deliveryRate = totalShipped > 0 ? ((delivered / totalShipped) * 100).toFixed(1) : 0;
-      const rtoRate = totalShipped > 0 ? ((rto / totalShipped) * 100).toFixed(1) : 0;
-      const cancelRate = totalOrders > 0 ? ((canceled / totalOrders) * 100).toFixed(1) : 0;
-      
-      document.getElementById('analytics-delivery-rate').textContent = `${deliveryRate}%`;
-      document.getElementById('analytics-rto-rate').textContent = `${rtoRate}%`;
-      document.getElementById('analytics-cancel-rate').textContent = `${cancelRate}%`;
-      
-      // Render Pie Chart
-      const ctx = document.getElementById('analyticsPieChart').getContext('2d');
-      if (state.charts.analyticsPie) {
-        state.charts.analyticsPie.destroy();
-      }
-      
-      const doughnutLabelsLinePlugin = {
-        id: 'doughnutLabelsLine',
-        afterDraw(chart) {
-          const { ctx } = chart;
-          chart.data.datasets.forEach((dataset, i) => {
-            const meta = chart.getDatasetMeta(i);
-            meta.data.forEach((datapoint, index) => {
-              const val = dataset.data[index];
-              if (val === 0) return;
-              
-              const total = dataset.data.reduce((a, b) => a + b, 0);
-              const percentage = ((val / total) * 100).toFixed(1) + '%';
-              
-              const centerPoint = datapoint.tooltipPosition();
-              const centerX = chart.chartArea.left + chart.chartArea.width / 2;
-              const centerY = chart.chartArea.top + chart.chartArea.height / 2;
-              
-              const angle = Math.atan2(centerPoint.y - centerY, centerPoint.x - centerX);
-              const radius = datapoint.outerRadius;
-              
-              const xLine = centerX + Math.cos(angle) * (radius + 20);
-              const yLine = centerY + Math.sin(angle) * (radius + 20);
-              
-              const isRight = Math.cos(angle) > 0;
-              const xText = xLine + (isRight ? 20 : -20);
-              
-              ctx.beginPath();
-              ctx.moveTo(centerPoint.x, centerPoint.y);
-              ctx.lineTo(xLine, yLine);
-              ctx.lineTo(xText, yLine);
-              ctx.strokeStyle = dataset.backgroundColor[index];
-              ctx.lineWidth = 1.5;
-              ctx.stroke();
-              
-              ctx.font = "bold 12px Inter";
-              ctx.fillStyle = "#ffffff";
-              ctx.textAlign = isRight ? 'left' : 'right';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(percentage, xText + (isRight ? 6 : -6), yLine);
-            });
-          });
-        }
-      };
-      
-      state.charts.analyticsPie = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Delivered', 'In Transit', 'RTO', 'Canceled', 'Failed', 'Other'],
-          datasets: [{
-            data: [
-              delivered,
-              inTransit,
-              rto,
-              canceled,
-              failed,
-              totalOrders - (delivered + inTransit + rto + canceled + failed)
-            ],
-            backgroundColor: [
-              CHART_COLORS['Delivered'],
-              CHART_COLORS['In Transit'],
-              CHART_COLORS['RTO'],
-              CHART_COLORS['Canceled'],
-              CHART_COLORS['Failed Delivery'],
-              CHART_COLORS['Other']
-            ],
-            borderWidth: 0,
-            hoverOffset: 4
-          }]
-        },
-        plugins: [doughnutLabelsLinePlugin],
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          layout: {
-            padding: 50
-          },
-          color: '#ffffff',
-          plugins: {
-            legend: {
-              position: 'bottom',
-              labels: { color: '#a1a1aa', padding: 20, font: { family: 'Inter', size: 12 } }
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const val = context.raw || 0;
-                  const total = context.chart._metasets[context.datasetIndex].total || 1;
-                  const percentage = ((val / total) * 100).toFixed(1) + '%';
-                  return ` ${context.label}: ${val} (${percentage})`;
-                }
-              }
-            }
-          },
-          cutout: '65%'
-        }
-      });
     }
 
     function renderPLTable(prefix, pl, deliveredCount) {
