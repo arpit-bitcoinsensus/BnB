@@ -440,6 +440,42 @@
         <span id="daily-last-updated" style="color:var(--text-muted); font-size:12px; margin-left:auto; font-weight:500;"></span>
       </div>
 
+      <div id="daily-scoreboard" class="card glass" style="margin-bottom: 24px; padding: 24px; display: none; background: rgba(5,5,5,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="margin: 0; font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Cumulative Net Profit</h3>
+            <div id="scoreboard-net-profit" style="font-size: 36px; font-weight: 700; margin-top: 8px;">₹0</div>
+            <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="scoreboard-date-range">...</div>
+          </div>
+          <div style="text-align: right;">
+            <button id="btn-toggle-breakdown" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border); padding: 8px 16px; border-radius: 8px; color: white; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;">
+              View Breakdown <span id="breakdown-icon">▼</span>
+            </button>
+          </div>
+        </div>
+        
+        <div id="scoreboard-breakdown" style="display: none; margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 24px; animation: fadeIn 0.3s ease;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+            <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+              <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total Revenue</div>
+              <div id="sb-revenue" style="font-size: 20px; font-weight: 700; color: white; margin-top: 4px;">₹0</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+              <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Product Cost</div>
+              <div id="sb-cogs" style="font-size: 20px; font-weight: 700; color: #f87171; margin-top: 4px;">-₹0</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+              <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Shipping & Logistics</div>
+              <div id="sb-shipping" style="font-size: 20px; font-weight: 700; color: #f87171; margin-top: 4px;">-₹0</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+              <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total Ad Spend</div>
+              <div id="sb-ads" style="font-size: 20px; font-weight: 700; color: #f87171; margin-top: 4px;">-₹0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div id="daily-feed" class="daily-feed-container">
         <!-- Day blocks rendered by JS -->
       </div>
@@ -975,6 +1011,17 @@
     // Setup Listeners
     document.addEventListener('DOMContentLoaded', () => {
       checkAuth();
+      document.getElementById('btn-toggle-breakdown')?.addEventListener('click', () => {
+        const breakdown = document.getElementById('scoreboard-breakdown');
+        const icon = document.getElementById('breakdown-icon');
+        if(breakdown.style.display === 'none') {
+          breakdown.style.display = 'block';
+          icon.textContent = '▲';
+        } else {
+          breakdown.style.display = 'none';
+          icon.textContent = '▼';
+        }
+      });
       document.getElementById('btn-login')?.addEventListener('click', handleLogin);
       document.getElementById('passcode-input')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
       document.getElementById('btn-intel-toggle')?.addEventListener('click', () => {
@@ -2309,6 +2356,12 @@
       const feedContainer = document.getElementById('daily-feed');
       feedContainer.innerHTML = ''; // clear
 
+      let totalRev = 0;
+      let totalCogs = 0;
+      let totalShip = 0;
+      let totalAds = 0;
+      let totalNet = 0;
+
       // To iterate newest to oldest
       const dayBlocks = [];
 
@@ -2340,6 +2393,12 @@
 
         const totalShopifySales = dayOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
         const pl = calcPL(revenue, deliveredCount, adCost, fulfilledCount, allDayItems, totalShopifySales);
+
+        totalRev += pl.revenue;
+        totalCogs += pl.productCost;
+        totalShip += pl.shippingCost;
+        totalAds += pl.adCost;
+        totalNet += pl.profit;
 
         const prettyDate = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
@@ -2497,6 +2556,21 @@
       
       if(dayBlocks.length === 0) {
         feedContainer.innerHTML = '<div class="empty-state">No days selected or invalid date range.</div>';
+        document.getElementById('daily-scoreboard').style.display = 'none';
+      } else {
+        document.getElementById('daily-scoreboard').style.display = 'block';
+        const netColor = totalNet >= 0 ? 'var(--profit-color)' : 'var(--loss-color)';
+        const profitEl = document.getElementById('scoreboard-net-profit');
+        profitEl.textContent = fmtK(totalNet);
+        profitEl.style.color = netColor;
+        profitEl.style.textShadow = totalNet >= 0 ? '0 0 20px rgba(52, 211, 153, 0.4)' : '0 0 20px rgba(248, 113, 113, 0.4)';
+
+        document.getElementById('scoreboard-date-range').textContent = `${new Date(dStart).toLocaleDateString()} to ${new Date(dEnd).toLocaleDateString()}`;
+
+        document.getElementById('sb-revenue').textContent = fmtK(totalRev);
+        document.getElementById('sb-cogs').textContent = '-' + fmtK(totalCogs);
+        document.getElementById('sb-shipping').textContent = '-' + fmtK(totalShip);
+        document.getElementById('sb-ads').textContent = '-' + fmtK(totalAds);
       }
     }
 
