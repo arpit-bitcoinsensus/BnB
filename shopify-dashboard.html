@@ -436,11 +436,11 @@
         <div style="display: flex; align-items: center; gap: 12px;">
           <div>
             <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Start Date</label>
-            <input type="date" id="scoreboard-start-date" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: white;">
+            <input type="date" id="scoreboard-start-date" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: white; color-scheme: dark; cursor: pointer;">
           </div>
           <div>
             <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">End Date</label>
-            <input type="date" id="scoreboard-end-date" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: white;">
+            <input type="date" id="scoreboard-end-date" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: white; color-scheme: dark; cursor: pointer;">
           </div>
           <button id="btn-calc-scoreboard" class="primary" style="align-self: flex-end; padding: 7px 16px;">Calculate</button>
         </div>
@@ -1256,9 +1256,7 @@
     function setupViewInputs() {
       const now = new Date();
       if (!document.getElementById('scoreboard-start-date').value) {
-        let d = new Date(now);
-        d.setDate(d.getDate() - 6);
-        document.getElementById('scoreboard-start-date').value = toDateStr(d);
+        document.getElementById('scoreboard-start-date').value = '2026-02-25';
       }
       if (!document.getElementById('scoreboard-end-date').value) {
         document.getElementById('scoreboard-end-date').value = toDateStr(now);
