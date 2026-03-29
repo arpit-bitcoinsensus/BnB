@@ -1617,6 +1617,7 @@
               if (o.fulfillment_status) row.fulfillment_status = o.fulfillment_status;
               if (o.financial_status) row.financial_status = o.financial_status;
               if (o.cancelled_at) row.cancelled_at = o.cancelled_at;
+              if (o.gateway) row.gateway = o.gateway;
               return row;
             });
 
@@ -2484,7 +2485,11 @@
         const deliveredCount = tagsCounts['Delivered'] || 0;
         const fulfilledCount = tagsCounts['Fulfilled'] || 0;
         const adCost = state.adCosts[dateStr] || 0;
-        const prepaidCount = dayOrders.filter(o => o.financial_status === 'paid').length;
+        // Prepaid = paid via an online gateway (not COD/manual).
+        // financial_status==='paid' is unreliable because Shopify also marks delivered COD
+        // orders as 'paid' after collection. We use the `gateway` field instead.
+        const COD_GATEWAYS = ['cash_on_delivery', 'manual', '', null, undefined];
+        const prepaidCount = dayOrders.filter(o => !COD_GATEWAYS.includes((o.gateway || '').toLowerCase())).length;
         
         // Collect all items for the day to calculate accurate P&L
         const allDayItems = [];
