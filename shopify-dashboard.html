@@ -2484,6 +2484,7 @@
         const deliveredCount = tagsCounts['Delivered'] || 0;
         const fulfilledCount = tagsCounts['Fulfilled'] || 0;
         const adCost = state.adCosts[dateStr] || 0;
+        const prepaidCount = dayOrders.filter(o => o.financial_status === 'paid').length;
         
         // Collect all items for the day to calculate accurate P&L
         const allDayItems = [];
@@ -2595,6 +2596,7 @@
             <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${tagsCounts['Canceled'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">RTO</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Unreachable</div><div class="metric-value" style="color:#facc15">${tagsCounts['Unreachable'] || 0}</div></div>
+            <div class="metric-card"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${prepaidCount}</div></div>
             <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
             <div class="metric-card">
               <div class="metric-label">Ad Spend</div>
