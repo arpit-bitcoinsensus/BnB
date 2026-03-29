@@ -1750,6 +1750,7 @@
         fulfillment_status: o.fulfillment_status,
         financial_status: o.financial_status,
         cancelled_at: o.cancelled_at,
+        gateway: o.gateway,
         customer: { first_name: o.customer_fn, last_name: o.customer_ln },
         line_items: o.order_items || []
       }));
