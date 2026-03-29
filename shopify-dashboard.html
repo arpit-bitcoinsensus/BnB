@@ -753,7 +753,7 @@
     const PRODUCT_COST = 555;
     const SHIPPING_COST = 135;
     const STORE_LAUNCH_DATE = '2026-02-01'; // User can adjust this if needed
-    const GATEWAY_INTEGRATION_DATE = '2026-03-28'; // Date payment gateway was integrated
+
     const STATUS_TAGS = ['Delivered','Canceled','Attempted Delivery','In Transit','Out for Delivery','Failed Delivery','Paid','Payment Pending','Unfulfilled','Fulfilled','RTO','Unreachable'];
     const CHART_COLORS = {
       'Delivered': '#34d399',
@@ -2491,21 +2491,7 @@
         const deliveredCount = tagsCounts['Delivered'] || 0;
         const fulfilledCount = tagsCounts['Fulfilled'] || 0;
         const adCost = state.adCosts[dateStr] || 0;
-        // Prepaid = paid via an online gateway (not COD/manual).
-        // financial_status==='paid' is unreliable because Shopify also marks delivered COD
-        // orders as 'paid' after collection. We use the `gateway` field instead.
-        const COD_GATEWAYS = ['cash_on_delivery', 'manual', '', null, undefined];
-        const isGatewayDate = dateStr >= GATEWAY_INTEGRATION_DATE;
-        const prepaidOrders = isGatewayDate ? dayOrders.filter(o => {
-          const gw = (o.gateway || '').toLowerCase();
-          const isCOD = COD_GATEWAYS.includes(gw) || gw.includes('cod') || gw.includes('cash') || gw.includes('manual');
-          return !isCOD;
-        }) : [];
-        const prepaidCount = prepaidOrders.length;
-        // Debug: log gateway values for days on/after integration date
-        if (isGatewayDate && dayOrders.length > 0) {
-          console.log(`[Prepaid Debug] ${dateStr}: gateways →`, dayOrders.map(o => o.gateway || '(null)'));
-        }
+
         
         // Collect all items for the day to calculate accurate P&L
         const allDayItems = [];
@@ -2617,7 +2603,6 @@
             <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${tagsCounts['Canceled'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">RTO</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Unreachable</div><div class="metric-value" style="color:#facc15">${tagsCounts['Unreachable'] || 0}</div></div>
-            ${isGatewayDate ? `<div class="metric-card"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${prepaidCount}</div></div>` : ''}
             <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
             <div class="metric-card">
               <div class="metric-label">Ad Spend</div>
