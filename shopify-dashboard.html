@@ -1618,7 +1618,11 @@
               if (o.fulfillment_status) row.fulfillment_status = o.fulfillment_status;
               if (o.financial_status) row.financial_status = o.financial_status;
               if (o.cancelled_at) row.cancelled_at = o.cancelled_at;
-              if (o.gateway) row.gateway = o.gateway;
+              if (o.payment_gateway_names && o.payment_gateway_names.length > 0) {
+                row.gateway = o.payment_gateway_names.join(', ');
+              } else if (o.gateway) {
+                row.gateway = o.gateway;
+              }
               return row;
             });
 
@@ -2492,7 +2496,11 @@
         // orders as 'paid' after collection. We use the `gateway` field instead.
         const COD_GATEWAYS = ['cash_on_delivery', 'manual', '', null, undefined];
         const isGatewayDate = dateStr >= GATEWAY_INTEGRATION_DATE;
-        const prepaidOrders = isGatewayDate ? dayOrders.filter(o => !COD_GATEWAYS.includes((o.gateway || '').toLowerCase())) : [];
+        const prepaidOrders = isGatewayDate ? dayOrders.filter(o => {
+          const gw = (o.gateway || '').toLowerCase();
+          const isCOD = COD_GATEWAYS.includes(gw) || gw.includes('cod') || gw.includes('cash') || gw.includes('manual');
+          return !isCOD;
+        }) : [];
         const prepaidCount = prepaidOrders.length;
         // Debug: log gateway values for days on/after integration date
         if (isGatewayDate && dayOrders.length > 0) {
