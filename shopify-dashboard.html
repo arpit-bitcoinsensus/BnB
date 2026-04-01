@@ -1481,6 +1481,23 @@
       return !isRTO && ssDelivered;
     }
 
+    // Returns { prepaid, cash } counts based on shipping_title field
+    // Prepaid: shipping_title contains 'prepaid'
+    // Cash: shipping_title contains 'cod', 'free', or anything else (default COD)
+    function getPaymentCounts(orders) {
+      let prepaid = 0, cash = 0;
+      orders.forEach(o => {
+        const st = (o.shipping_title || '').toLowerCase();
+        if (st.includes('prepaid')) {
+          prepaid++;
+        } else {
+          // COD, FREE Shipping, Express (COD), or unknown → count as Cash
+          cash++;
+        }
+      });
+      return { prepaid, cash };
+    }
+
     function getTotalRevenue(orders) {
       // Revenue only from truly delivered orders
       return orders
@@ -1637,6 +1654,10 @@
               } else if (o.gateway) {
                 row.gateway = o.gateway;
               }
+              // Store shipping line title (e.g. 'Standard (COD)', 'Standard (Prepaid)', 'FREE Shipping')
+              if (o.shipping_lines && o.shipping_lines.length > 0) {
+                row.shipping_title = o.shipping_lines[0].title || '';
+              }
               return row;
             });
 
@@ -1770,6 +1791,7 @@
         financial_status: o.financial_status,
         cancelled_at: o.cancelled_at,
         gateway: o.gateway,
+        shipping_title: o.shipping_title || '',
         customer: { first_name: o.customer_fn, last_name: o.customer_ln },
         line_items: o.order_items || []
       }));
@@ -2522,6 +2544,7 @@
 
         const totalShopifySales = dayOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
         const pl = calcPL(revenue, deliveredCount, adCost, fulfilledCount, allDayItems, totalShopifySales);
+        const paymentCounts = getPaymentCounts(dayOrders);
 
         const prettyDate = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
@@ -2626,6 +2649,8 @@
                 <button class="inline-btn primary" id="btn-ad-${dateStr}">Save</button>
               </div>
             </div>
+            <div class="metric-card"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${paymentCounts.prepaid}</div></div>
+            <div class="metric-card"><div class="metric-label">Cash Orders</div><div class="metric-value" style="color:#fb923c">${paymentCounts.cash}</div></div>
             <div class="metric-card"><div class="metric-label">Net Profit</div><div class="metric-value ${pl.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(pl.profit)}</div></div>
           </div>
 
@@ -2801,6 +2826,8 @@
       let totalRTO = 0;
       let totalRTOPrediction = 0;
       let totalShopifySales = 0;
+      let totalPrepaid = 0;
+      let totalCash = 0;
       
       let allItems = [];
 
@@ -2835,6 +2862,9 @@
         // NOTE: 'undelivered' tag is already merged into RTO via categorizeOrders
         totalAdCost += dAd;
         totalShopifySales += dTotalSales;
+        const dPayment = getPaymentCounts(dOrders);
+        totalPrepaid += dPayment.prepaid;
+        totalCash += dPayment.cash;
       }
 
       const mPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allItems, totalShopifySales);
@@ -2849,6 +2879,8 @@
         <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${totalCanceled}</div></div>
         ${(mEnd >= new Date('2026-03-28T00:00:00')) ? `<div class="metric-card"><div class="metric-label">Possibility of RTO</div><div class="metric-value text-warning">${totalRTOPrediction}</div></div>` : ''}
         ${(mEnd >= new Date('2026-02-25T00:00:00')) ? `<div class="metric-card"><div class="metric-label">RTO / Undelivered</div><div class="metric-value text-loss">${totalRTO}</div></div>` : ''}
+        <div class="metric-card"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${totalPrepaid}</div></div>
+        <div class="metric-card"><div class="metric-label">Cash Orders</div><div class="metric-value" style="color:#fb923c">${totalCash}</div></div>
         <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
         <div class="metric-card">
           <div class="metric-label">Ad Spend</div>
