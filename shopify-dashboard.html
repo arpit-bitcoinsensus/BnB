@@ -103,6 +103,7 @@
 
     .text-profit { color: var(--profit-color); text-shadow: 0 0 15px rgba(16,185,129,0.3); }
     .text-loss { color: var(--loss-color); text-shadow: 0 0 15px rgba(239,68,68,0.3); }
+    .text-warning { color: #f59e0b; text-shadow: 0 0 15px rgba(245,158,11,0.3); }
 
     .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
     .card { border-radius: 16px; padding: 24px; transition: transform 0.3s; }
@@ -754,7 +755,7 @@
     const SHIPPING_COST = 135;
     const STORE_LAUNCH_DATE = '2026-02-01'; // User can adjust this if needed
 
-    const STATUS_TAGS = ['Delivered','Canceled','Attempted Delivery','In Transit','Out for Delivery','Failed Delivery','Paid','Payment Pending','Unfulfilled','Fulfilled','RTO','Unreachable'];
+    const STATUS_TAGS = ['Delivered','Canceled','Attempted Delivery','In Transit','Out for Delivery','Failed Delivery','Paid','Payment Pending','Unfulfilled','Fulfilled','RTO','Unreachable','RTO Prediction'];
     const CHART_COLORS = {
       'Delivered': '#34d399',
       'Canceled': '#f87171',
@@ -766,7 +767,9 @@
       'Payment Pending': '#fbbf24',
       'Unfulfilled': '#f87171',
       'Fulfilled': '#34d399',
+      'Unreachable': '#f97316',
       'RTO': '#ef4444',
+      'RTO Prediction': '#f59e0b',
       'Other': '#52525b'
     };
     // CORE STATE
@@ -1400,7 +1403,10 @@
         // --- Detect delivery state ---
 
         // RTO: Shiprocket tag containing 'rto'
-        const isRTO = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto'));
+        const isRTO = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto') && !t.includes('rto_prediction'));
+        
+        // RTO Prediction (Possibility of RTO)
+        const isRTOPrediction = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto_prediction'));
 
         // Unreachable: Shiprocket tag containing 'unreachable'
         const isUnreachable = rawTags.some(t => !t.startsWith('__ss:') && t.includes('unreachable'));
@@ -1439,6 +1445,7 @@
         if (isFulfilled)       counts['Fulfilled']++;
         if (isDelivered)       counts['Delivered']++;
         if (isRTO)             counts['RTO']++;
+        if (isRTOPrediction)   counts['RTO Prediction']++;
         if (isUnreachable)     counts['Unreachable']++;
         if (isInTransit)       counts['In Transit']++;
         if (isOutForDelivery)  counts['Out for Delivery']++;
@@ -1460,7 +1467,7 @@
       const syntheticSS = rawTags.find(t => t.startsWith('__ss:'));
       const shipmentStatus = syntheticSS ? syntheticSS.replace('__ss:', '') : '';
 
-      const isRTO = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto'));
+      const isRTO = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto') && !t.includes('rto_prediction'));
       
       const ssDelivered = shipmentStatus === 'delivered' || rawTags.some(t => t === 'delivered' && !t.startsWith('__ss:'));
 
@@ -2601,7 +2608,8 @@
             <div class="metric-card"><div class="metric-label">Out for Delivery</div><div class="metric-value" style="color:#a78bfa">${tagsCounts['Out for Delivery'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Failed Delivery</div><div class="metric-value" style="color:#f97316">${tagsCounts['Failed Delivery'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${tagsCounts['Canceled'] || 0}</div></div>
-            <div class="metric-card"><div class="metric-label">RTO</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>
+            <div class="metric-card"><div class="metric-label">Possibility of RTO</div><div class="metric-value text-warning">${tagsCounts['RTO Prediction'] || 0}</div></div>
+            <div class="metric-card"><div class="metric-label">Actual RTO</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Unreachable</div><div class="metric-value" style="color:#facc15">${tagsCounts['Unreachable'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
             <div class="metric-card">
@@ -2783,6 +2791,8 @@
       let totalCanceled = 0;
       let totalTransit = 0;
       let totalAdCost = 0;
+      let totalRTO = 0;
+      let totalRTOPrediction = 0;
       let totalShopifySales = 0;
       
       let allItems = [];
@@ -2813,6 +2823,8 @@
         totalFulfilled += dFul;
         totalCanceled += tCounts['Canceled'] || 0;
         totalTransit += tCounts['In Transit'] || 0;
+        totalRTO += tCounts['RTO'] || 0;
+        totalRTOPrediction += tCounts['RTO Prediction'] || 0;
         totalAdCost += dAd;
         totalShopifySales += dTotalSales;
       }
@@ -2827,7 +2839,8 @@
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${mRet.repeatRate}%</div></div>
         <div class="metric-card"><div class="metric-label">In Transit</div><div class="metric-value" style="color:var(--primary)">${totalTransit}</div></div>
         <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${totalCanceled}</div></div>
-        <div class="metric-card"><div class="metric-label">RTO</div><div class="metric-value text-loss">${totalRTO}</div></div>
+        <div class="metric-card"><div class="metric-label">Possibility of RTO</div><div class="metric-value text-warning">${totalRTOPrediction}</div></div>
+        <div class="metric-card"><div class="metric-label">Actual RTO</div><div class="metric-value text-loss">${totalRTO}</div></div>
         <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
         <div class="metric-card">
           <div class="metric-label">Ad Spend</div>
