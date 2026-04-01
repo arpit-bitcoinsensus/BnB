@@ -1402,8 +1402,8 @@
 
         // --- Detect delivery state ---
 
-        // RTO: Shiprocket tag containing 'rto'
-        const isRTO = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto') && !t.includes('rto_prediction'));
+        // RTO: Shiprocket tag containing 'rto' OR 'undelivered' (both mean return-to-origin)
+        const isRTO = rawTags.some(t => !t.startsWith('__ss:') && (t.includes('rto') && !t.includes('rto_prediction')) || t.includes('undelivered'));
         
         // RTO Prediction (Possibility of RTO)
         const isRTOPrediction = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto_prediction'));
@@ -2608,8 +2608,8 @@
             <div class="metric-card"><div class="metric-label">Out for Delivery</div><div class="metric-value" style="color:#a78bfa">${tagsCounts['Out for Delivery'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Failed Delivery</div><div class="metric-value" style="color:#f97316">${tagsCounts['Failed Delivery'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${tagsCounts['Canceled'] || 0}</div></div>
-            <div class="metric-card"><div class="metric-label">Possibility of RTO</div><div class="metric-value text-warning">${tagsCounts['RTO Prediction'] || 0}</div></div>
-            <div class="metric-card"><div class="metric-label">Actual RTO</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>
+            ${(d >= new Date('2026-03-28T00:00:00')) ? `<div class="metric-card"><div class="metric-label">Possibility of RTO</div><div class="metric-value text-warning">${tagsCounts['RTO Prediction'] || 0}</div></div>` : ''}
+            ${(d >= new Date('2026-02-25T00:00:00')) ? `<div class="metric-card"><div class="metric-label">RTO / Undelivered</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>` : ''}
             <div class="metric-card"><div class="metric-label">Unreachable</div><div class="metric-value" style="color:#facc15">${tagsCounts['Unreachable'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
             <div class="metric-card">
@@ -2825,6 +2825,7 @@
         totalTransit += tCounts['In Transit'] || 0;
         totalRTO += tCounts['RTO'] || 0;
         totalRTOPrediction += tCounts['RTO Prediction'] || 0;
+        // NOTE: 'undelivered' tag is already merged into RTO via categorizeOrders
         totalAdCost += dAd;
         totalShopifySales += dTotalSales;
       }
@@ -2839,8 +2840,8 @@
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${mRet.repeatRate}%</div></div>
         <div class="metric-card"><div class="metric-label">In Transit</div><div class="metric-value" style="color:var(--primary)">${totalTransit}</div></div>
         <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${totalCanceled}</div></div>
-        <div class="metric-card"><div class="metric-label">Possibility of RTO</div><div class="metric-value text-warning">${totalRTOPrediction}</div></div>
-        <div class="metric-card"><div class="metric-label">Actual RTO</div><div class="metric-value text-loss">${totalRTO}</div></div>
+        ${(mEnd >= new Date('2026-03-28T00:00:00')) ? `<div class="metric-card"><div class="metric-label">Possibility of RTO</div><div class="metric-value text-warning">${totalRTOPrediction}</div></div>` : ''}
+        ${(mEnd >= new Date('2026-02-25T00:00:00')) ? `<div class="metric-card"><div class="metric-label">RTO / Undelivered</div><div class="metric-value text-loss">${totalRTO}</div></div>` : ''}
         <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
         <div class="metric-card">
           <div class="metric-label">Ad Spend</div>
