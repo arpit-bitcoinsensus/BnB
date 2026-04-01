@@ -1402,17 +1402,24 @@
 
         // --- Detect delivery state ---
 
-        // RTO: Shiprocket tag containing 'rto' OR 'undelivered' (both mean return-to-origin)
-        const isRTO = rawTags.some(t => !t.startsWith('__ss:') && (t.includes('rto') && !t.includes('rto_prediction')) || t.includes('undelivered'));
-        
+        // Delivered: compute FIRST so we can use it in RTO detection below
+        const isDelivered = isOrderDelivered(o);
+
+        // RTO: Shiprocket tag containing 'rto' OR 'undelivered' — BUT only count 'undelivered'
+        // if the order is NOT delivered. Orders can have a historical 'Undelivered' tag while
+        // ultimately being delivered (e.g. #1274, #1262 in screenshots).
+        const isRTO = !isDelivered && rawTags.some(t =>
+          !t.startsWith('__ss:') && (
+            (t.includes('rto') && !t.includes('rto_prediction')) ||
+            t.includes('undelivered')
+          )
+        );
+
         // RTO Prediction (Possibility of RTO)
         const isRTOPrediction = rawTags.some(t => !t.startsWith('__ss:') && t.includes('rto_prediction'));
 
         // Unreachable: Shiprocket tag containing 'unreachable'
         const isUnreachable = rawTags.some(t => !t.startsWith('__ss:') && t.includes('unreachable'));
-
-        // Delivered: strictly synchronized with revenue calculation
-        const isDelivered = isOrderDelivered(o);
 
         // Fulfilled: Shopify says order has been shipped out OR it is delivered
         const isFulfilled = (fs === 'fulfilled' || fs === 'partial') || isDelivered;
