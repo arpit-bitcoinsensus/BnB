@@ -96,8 +96,29 @@
 
     /* Grid Layouts */
     .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 20px; margin-bottom: 32px; }
-    .metric-card { padding: 20px; border-radius: 12px; display: flex; flex-direction: column; transition: transform 0.3s, box-shadow 0.3s; }
-    .metric-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.2); }
+    .metric-card { padding: 20px; border-radius: 12px; display: flex; flex-direction: column; transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s, background 0.25s; cursor: default; }
+    .metric-card.clickable { cursor: pointer; }
+    .metric-card.clickable:hover { transform: translateY(-5px); box-shadow: 0 14px 32px rgba(0,0,0,0.5); }
+    .metric-card.clickable:hover.glow-green  { border-color: rgba(52,211,153,0.5);  box-shadow: 0 8px 28px rgba(52,211,153,0.25); }
+    .metric-card.clickable:hover.glow-red    { border-color: rgba(248,113,113,0.5); box-shadow: 0 8px 28px rgba(248,113,113,0.25); }
+    .metric-card.clickable:hover.glow-blue   { border-color: rgba(96,165,250,0.5);  box-shadow: 0 8px 28px rgba(96,165,250,0.25); }
+    .metric-card.clickable:hover.glow-purple { border-color: rgba(167,139,250,0.5); box-shadow: 0 8px 28px rgba(167,139,250,0.25); }
+    .metric-card.clickable:hover.glow-orange { border-color: rgba(249,115,22,0.5);  box-shadow: 0 8px 28px rgba(249,115,22,0.25); }
+    .metric-card.clickable:hover.glow-yellow { border-color: rgba(250,204,21,0.5);  box-shadow: 0 8px 28px rgba(250,204,21,0.25); }
+    .metric-card.clickable:hover.glow-indigo { border-color: rgba(129,140,248,0.5); box-shadow: 0 8px 28px rgba(129,140,248,0.25); }
+    .metric-card.clickable:hover.glow-amber  { border-color: rgba(251,146,60,0.5);  box-shadow: 0 8px 28px rgba(251,146,60,0.25); }
+    .metric-card.clickable:hover.glow-white  { border-color: rgba(255,255,255,0.3);  box-shadow: 0 8px 28px rgba(255,255,255,0.1); }
+    /* Active/selected card state */
+    .metric-card.active-filter { transform: translateY(-5px); }
+    .metric-card.active-filter.glow-green  { border-color: rgba(52,211,153,0.7);  box-shadow: 0 0 0 2px rgba(52,211,153,0.3),  0 12px 30px rgba(52,211,153,0.3);  background: rgba(52,211,153,0.08); }
+    .metric-card.active-filter.glow-red    { border-color: rgba(248,113,113,0.7); box-shadow: 0 0 0 2px rgba(248,113,113,0.3), 0 12px 30px rgba(248,113,113,0.3); background: rgba(248,113,113,0.08); }
+    .metric-card.active-filter.glow-blue   { border-color: rgba(96,165,250,0.7);  box-shadow: 0 0 0 2px rgba(96,165,250,0.3),  0 12px 30px rgba(96,165,250,0.3);  background: rgba(96,165,250,0.08); }
+    .metric-card.active-filter.glow-purple { border-color: rgba(167,139,250,0.7); box-shadow: 0 0 0 2px rgba(167,139,250,0.3), 0 12px 30px rgba(167,139,250,0.3); background: rgba(167,139,250,0.08); }
+    .metric-card.active-filter.glow-orange { border-color: rgba(249,115,22,0.7);  box-shadow: 0 0 0 2px rgba(249,115,22,0.3),  0 12px 30px rgba(249,115,22,0.3);  background: rgba(249,115,22,0.08); }
+    .metric-card.active-filter.glow-yellow { border-color: rgba(250,204,21,0.7);  box-shadow: 0 0 0 2px rgba(250,204,21,0.3),  0 12px 30px rgba(250,204,21,0.3);  background: rgba(250,204,21,0.08); }
+    .metric-card.active-filter.glow-indigo { border-color: rgba(129,140,248,0.7); box-shadow: 0 0 0 2px rgba(129,140,248,0.3), 0 12px 30px rgba(129,140,248,0.3); background: rgba(129,140,248,0.08); }
+    .metric-card.active-filter.glow-amber  { border-color: rgba(251,146,60,0.7);  box-shadow: 0 0 0 2px rgba(251,146,60,0.3),  0 12px 30px rgba(251,146,60,0.3);  background: rgba(251,146,60,0.08); }
+    .metric-card.active-filter.glow-white  { border-color: rgba(255,255,255,0.5);  box-shadow: 0 0 0 2px rgba(255,255,255,0.15), 0 12px 30px rgba(255,255,255,0.1);  background: rgba(255,255,255,0.04); }
     .metric-value { font-size: 28px; font-weight: 700; margin-top: 12px; letter-spacing: -0.5px; }
     .metric-label { font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
 
@@ -1174,6 +1195,143 @@
     function getTagClass(t) {
       return 'tag-' + t.toLowerCase().replace(/\s+/g, '-');
     }
+
+    // Per-day active filter state: dateStr -> filterKey (null = show all)
+    const dayFilterState = {};
+
+    // Filter orders for a day given a filter key
+    function getFilteredOrders(orders, filterKey) {
+      if (!filterKey || filterKey === 'all') return orders;
+      return orders.filter(o => {
+        const tCounts = categorizeOrders([o]);
+        if (filterKey === 'orders')          return true;
+        if (filterKey === 'fulfilled')       return tCounts['Fulfilled'] > 0;
+        if (filterKey === 'delivered')       return tCounts['Delivered'] > 0;
+        if (filterKey === 'in-transit')      return tCounts['In Transit'] > 0;
+        if (filterKey === 'out-delivery')    return tCounts['Out for Delivery'] > 0;
+        if (filterKey === 'failed-delivery') return tCounts['Failed Delivery'] > 0;
+        if (filterKey === 'canceled')        return tCounts['Canceled'] > 0;
+        if (filterKey === 'rto-prediction')  return tCounts['RTO Prediction'] > 0;
+        if (filterKey === 'rto')             return tCounts['RTO'] > 0;
+        if (filterKey === 'unreachable')     return tCounts['Unreachable'] > 0;
+        if (filterKey === 'prepaid')         return isOrderPrepaidRevenue(o);
+        if (filterKey === 'cash')            return !isOrderPrepaidRevenue(o);
+        return true;
+      });
+    }
+
+    // Called when a metric card is clicked — toggle filter for that day
+    window.handleCardFilter = function(dateStr, filterKey, cardEl) {
+      const ordersDiv = document.getElementById('orders-' + dateStr);
+      const currentFilter = dayFilterState[dateStr];
+
+      // Toggle: clicking active filter resets to all
+      if (currentFilter === filterKey) {
+        dayFilterState[dateStr] = null;
+        // Remove active class from all cards in this day block
+        cardEl.closest('.metrics-grid').querySelectorAll('.metric-card').forEach(c => c.classList.remove('active-filter'));
+        // Re-render the table header label
+        const header = document.getElementById('filter-label-' + dateStr);
+        if (header) header.textContent = `View Orders`;
+      } else {
+        dayFilterState[dateStr] = filterKey;
+        // Remove active class from all cards, then set on clicked card
+        cardEl.closest('.metrics-grid').querySelectorAll('.metric-card').forEach(c => c.classList.remove('active-filter'));
+        cardEl.classList.add('active-filter');
+        // Update header label
+        const header = document.getElementById('filter-label-' + dateStr);
+        if (header) header.textContent = `Filtered: ${cardEl.querySelector('.metric-label').textContent}`;
+      }
+
+      // Always show orders section when a card is clicked
+      if (ordersDiv) ordersDiv.style.display = 'block';
+
+      // Re-render just the tbody for this day
+      renderDayOrderRows(dateStr);
+    };
+
+    // Renders (or re-renders) only the order rows for a given day based on current filter
+    window.renderDayOrderRows = function(dateStr) {
+      const tbody = document.getElementById('tbody-' + dateStr);
+      const countEl = document.getElementById('order-count-' + dateStr);
+      if (!tbody) return;
+
+      const allDayOrders = window._dayOrdersCache[dateStr] || [];
+      const filterKey = dayFilterState[dateStr] || null;
+      const filtered = getFilteredOrders(allDayOrders, filterKey);
+
+      const maxRows = 50;
+      countEl.textContent = filterKey
+        ? `${filtered.length} of ${allDayOrders.length} orders`
+        : `${allDayOrders.length}`;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:24px;">No orders match this filter</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.slice(0, maxRows).map(o => {
+        const tStr = o.tags || '';
+        const tRender = tStr.split(',').filter(t=>t.trim()).map(t => `<span class="order-tag">${t.trim()}</span>`).join('');
+        const fn = (o.customer && o.customer.first_name) || '';
+        const ln = (o.customer && o.customer.last_name) || '';
+        const time = o.created_at ? new Date(o.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+        const isPrepaid = isOrderPrepaidRevenue(o);
+        const isOrderDeliv = isOrderDelivered(o);
+        const orderCountsForRevenue = isOrderDeliv || isPrepaid;
+        const paymentBadge = isPrepaid
+          ? `<span style="font-size:10px; font-weight:700; background:rgba(129,140,248,0.15); color:#818cf8; border:1px solid rgba(129,140,248,0.4); padding:2px 7px; border-radius:4px; margin-left:6px; vertical-align:middle;">PREPAID</span>`
+          : `<span style="font-size:10px; font-weight:700; background:rgba(251,146,60,0.15); color:#fb923c; border:1px solid rgba(251,146,60,0.4); padding:2px 7px; border-radius:4px; margin-left:6px; vertical-align:middle;">COD</span>`;
+        const paymentMethod = isPrepaid ? 'Prepaid' : 'COD';
+        const orderRevenue = orderCountsForRevenue ? parseFloat(o.total_price || 0) : 0;
+        const revenueHtml = orderCountsForRevenue
+          ? `<span style="color:${isPrepaid && !isOrderDeliv ? '#818cf8' : 'var(--profit-color)'}; font-weight:600;">${fmt(orderRevenue)}</span>`
+          : `<span style="color:var(--text-muted); opacity:0.5;">-</span>`;
+
+        let itemsHtml = '';
+        if (o.line_items && o.line_items.length > 0) {
+          itemsHtml = '<div style="margin-top:10px; font-size:12px; color:var(--text-muted); background:rgba(0,0,0,0.3); padding:8px 10px; border-radius:6px;">';
+          o.line_items.forEach(li => {
+            const isItemFulfilled = li.fulfillment_status === 'fulfilled';
+            let revAdded = 0, statusText = '', statusColor = 'var(--text-muted)';
+            if (isPrepaid && !isOrderDeliv) {
+              revAdded = parseFloat(li.price) * li.quantity;
+              const deliveryStatus = o.fulfillment_status === 'fulfilled' ? 'Shipped' : (o.fulfillment_status === 'partial' && isItemFulfilled ? 'Shipped' : 'Pending');
+              statusText = `💳 Prepaid · ${deliveryStatus}`; statusColor = '#818cf8';
+            } else if (o.fulfillment_status === 'fulfilled') {
+              revAdded = parseFloat(li.price) * li.quantity;
+              statusText = isOrderDeliv ? '✓ Delivered' : 'Fulfilled';
+              statusColor = isOrderDeliv ? 'var(--profit-color)' : 'var(--text-muted)';
+            } else if (o.fulfillment_status === 'partial') {
+              if (isItemFulfilled) { revAdded = parseFloat(li.price) * li.quantity; statusText = isOrderDeliv ? '✓ Delivered' : 'Fulfilled'; statusColor = isOrderDeliv ? 'var(--profit-color)' : 'var(--text-muted)'; }
+              else { statusText = '✗ Undelivered'; statusColor = 'var(--loss-color)'; }
+            } else {
+              statusText = (o.fulfillment_status || 'Unfulfilled'); statusText = statusText.charAt(0).toUpperCase() + statusText.slice(1);
+            }
+            const showRev = orderCountsForRevenue && revAdded > 0;
+            const revHtml = showRev ? `<span style="color:${isPrepaid && !isOrderDeliv ? '#818cf8' : 'var(--profit-color)'}">+${fmt(revAdded)}</span>` : `<span style="opacity:0.5">-</span>`;
+            itemsHtml += `<div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.04); align-items:center;"><span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:10px;">${li.quantity}x ${li.title}</span><span style="width:130px; color:${statusColor}; font-size:11px;">${statusText}</span><span style="width:80px; text-align:right; font-family:monospace;">${revHtml}</span></div>`;
+          });
+          if (isPrepaid && !isOrderDeliv) {
+            itemsHtml += `<div style="margin-top:5px; padding:5px 8px; background:rgba(129,140,248,0.08); border:1px solid rgba(129,140,248,0.25); border-radius:4px; font-size:11px; color:#818cf8; display:flex; justify-content:space-between;"><span>💳 Prepaid revenue counted now (payment confirmed)</span><span style="font-weight:700;">${fmt(parseFloat(o.total_price || 0))}</span></div>`;
+          }
+          itemsHtml += '</div>';
+        }
+
+        return `<tr>
+          <td style="vertical-align:top; padding-top:14px;"><div style="font-weight:500; display:flex; align-items:center; gap:4px;">${o.name}${paymentBadge}</div>${itemsHtml}</td>
+          <td style="vertical-align:top; padding-top:14px;">${fn} ${ln}</td>
+          <td style="vertical-align:top; padding-top:14px;">${fmt(o.total_price)}</td>
+          <td style="vertical-align:top; padding-top:14px; font-size:12px; color:var(--text-muted);">${paymentMethod}</td>
+          <td style="vertical-align:top; padding-top:14px;">${revenueHtml}</td>
+          <td style="vertical-align:top; padding-top:14px;"><div class="order-tags">${tRender}</div></td>
+          <td style="vertical-align:top; padding-top:14px;">${time}</td>
+        </tr>`;
+      }).join('');
+    };
+
+    // Cache for day orders (populated in renderDaily)
+    window._dayOrdersCache = {};
 
     // Storage (Supabase)
     async function saveAdCost(dateStr, cost) {
@@ -2671,8 +2829,8 @@
           `;
         }).join('');
 
-        let countText = dayOrders.length.toString();
-        if(dayOrders.length > maxRows) countText = `Showing ${maxRows} of ${dayOrders.length}`;
+        // Cache orders for this day so filter can re-render without refetch
+        window._dayOrdersCache[dateStr] = dayOrders;
 
         // Create DOM element for the day block
         const dayEl = document.createElement('div');
@@ -2686,16 +2844,16 @@
           </div>
 
           <div class="metrics-grid" style="margin-bottom: 24px;">
-            <div class="metric-card"><div class="metric-label">Orders</div><div class="metric-value">${dayOrders.length}</div></div>
-            <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${tagsCounts['Fulfilled'] || 0}</div></div>
-            <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${deliveredCount}</div></div>
-            <div class="metric-card"><div class="metric-label">In Transit</div><div class="metric-value" style="color:#60a5fa">${tagsCounts['In Transit'] || 0}</div></div>
-            <div class="metric-card"><div class="metric-label">Out for Delivery</div><div class="metric-value" style="color:#a78bfa">${tagsCounts['Out for Delivery'] || 0}</div></div>
-            <div class="metric-card"><div class="metric-label">Failed Delivery</div><div class="metric-value" style="color:#f97316">${tagsCounts['Failed Delivery'] || 0}</div></div>
-            <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${tagsCounts['Canceled'] || 0}</div></div>
-            ${(d >= new Date('2026-03-28T00:00:00')) ? `<div class="metric-card"><div class="metric-label">Possibility of RTO</div><div class="metric-value text-warning">${tagsCounts['RTO Prediction'] || 0}</div></div>` : ''}
-            ${(d >= new Date('2026-02-25T00:00:00')) ? `<div class="metric-card"><div class="metric-label">RTO / Undelivered</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>` : ''}
-            <div class="metric-card"><div class="metric-label">Unreachable</div><div class="metric-value" style="color:#facc15">${tagsCounts['Unreachable'] || 0}</div></div>
+            <div class="metric-card clickable glow-white"  onclick="handleCardFilter('${dateStr}','orders',this)"><div class="metric-label">Orders</div><div class="metric-value">${dayOrders.length}</div></div>
+            <div class="metric-card clickable glow-green"  onclick="handleCardFilter('${dateStr}','fulfilled',this)"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${tagsCounts['Fulfilled'] || 0}</div></div>
+            <div class="metric-card clickable glow-green"  onclick="handleCardFilter('${dateStr}','delivered',this)"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${deliveredCount}</div></div>
+            <div class="metric-card clickable glow-blue"   onclick="handleCardFilter('${dateStr}','in-transit',this)"><div class="metric-label">In Transit</div><div class="metric-value" style="color:#60a5fa">${tagsCounts['In Transit'] || 0}</div></div>
+            <div class="metric-card clickable glow-purple" onclick="handleCardFilter('${dateStr}','out-delivery',this)"><div class="metric-label">Out for Delivery</div><div class="metric-value" style="color:#a78bfa">${tagsCounts['Out for Delivery'] || 0}</div></div>
+            <div class="metric-card clickable glow-orange" onclick="handleCardFilter('${dateStr}','failed-delivery',this)"><div class="metric-label">Failed Delivery</div><div class="metric-value" style="color:#f97316">${tagsCounts['Failed Delivery'] || 0}</div></div>
+            <div class="metric-card clickable glow-red"    onclick="handleCardFilter('${dateStr}','canceled',this)"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${tagsCounts['Canceled'] || 0}</div></div>
+            ${(d >= new Date('2026-03-28T00:00:00')) ? `<div class="metric-card clickable glow-yellow" onclick="handleCardFilter('${dateStr}','rto-prediction',this)"><div class="metric-label">Possibility of RTO</div><div class="metric-value text-warning">${tagsCounts['RTO Prediction'] || 0}</div></div>` : ''}
+            ${(d >= new Date('2026-02-25T00:00:00')) ? `<div class="metric-card clickable glow-red"    onclick="handleCardFilter('${dateStr}','rto',this)"><div class="metric-label">RTO / Undelivered</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>` : ''}
+            <div class="metric-card clickable glow-yellow" onclick="handleCardFilter('${dateStr}','unreachable',this)"><div class="metric-label">Unreachable</div><div class="metric-value" style="color:#facc15">${tagsCounts['Unreachable'] || 0}</div></div>
             <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
             <div class="metric-card">
               <div class="metric-label">Ad Spend</div>
@@ -2704,14 +2862,14 @@
                 <button class="inline-btn primary" id="btn-ad-${dateStr}">Save</button>
               </div>
             </div>
-            ${(d >= new Date(PREPAID_LAUNCH_DATE + 'T00:00:00')) ? `<div class="metric-card"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${paymentCounts.prepaid}</div></div>` : ''}
-            ${(d >= new Date(PREPAID_LAUNCH_DATE + 'T00:00:00')) ? `<div class="metric-card"><div class="metric-label">Cash Orders</div><div class="metric-value" style="color:#fb923c">${paymentCounts.cash}</div></div>` : ''}
+            ${(d >= new Date(PREPAID_LAUNCH_DATE + 'T00:00:00')) ? `<div class="metric-card clickable glow-indigo" onclick="handleCardFilter('${dateStr}','prepaid',this)"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${paymentCounts.prepaid}</div></div>` : ''}
+            ${(d >= new Date(PREPAID_LAUNCH_DATE + 'T00:00:00')) ? `<div class="metric-card clickable glow-amber"  onclick="handleCardFilter('${dateStr}','cash',this)"><div class="metric-label">Cash Orders</div><div class="metric-value" style="color:#fb923c">${paymentCounts.cash}</div></div>` : ''}
             <div class="metric-card"><div class="metric-label">Net Profit</div><div class="metric-value ${pl.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(pl.profit)}</div></div>
           </div>
 
           <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;" onclick="document.getElementById('orders-${dateStr}').style.display = document.getElementById('orders-${dateStr}').style.display === 'none' ? 'block' : 'none'">
-            <h3 style="margin:0; font-size: 16px;">View Orders (${countText})</h3>
-            <span style="color:var(--text-muted)">▼</span>
+            <h3 style="margin:0; font-size: 16px;" id="filter-label-${dateStr}">View Orders</h3>
+            <span style="color:var(--text-muted)">▼ <span id="order-count-${dateStr}" style="font-size:13px; color:var(--text-muted);">${dayOrders.length}</span></span>
           </div>
 
           <div id="orders-${dateStr}" style="display: none; margin-top: 16px;">
@@ -2728,7 +2886,7 @@
                     <th>Time</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody id="tbody-${dateStr}">
                   ${orderRows || '<tr><td colspan="7" style="text-align:center; color:var(--text-muted)">No orders this day</td></tr>'}
                 </tbody>
               </table>
