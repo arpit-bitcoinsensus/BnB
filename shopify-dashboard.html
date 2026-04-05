@@ -754,6 +754,7 @@
     const PRODUCT_COST = 555;
     const SHIPPING_COST = 135;
     const STORE_LAUNCH_DATE = '2026-02-01'; // User can adjust this if needed
+    const PREPAID_LAUNCH_DATE = '2026-03-28'; // Date from which prepaid orders started
 
     const STATUS_TAGS = ['Delivered','Canceled','Attempted Delivery','In Transit','Out for Delivery','Failed Delivery','Paid','Payment Pending','Unfulfilled','Fulfilled','RTO','Unreachable','RTO Prediction'];
     const CHART_COLORS = {
@@ -1498,10 +1499,21 @@
       return { prepaid, cash };
     }
 
+    // Returns true if a prepaid order should count towards revenue
+    // (order was placed on or after PREPAID_LAUNCH_DATE and payment method is prepaid)
+    function isOrderPrepaidRevenue(o) {
+      const orderDate = o.created_at ? o.created_at.substring(0, 10) : '';
+      if (orderDate < PREPAID_LAUNCH_DATE) return false;
+      const st = (o.shipping_title || '').toLowerCase();
+      return st.includes('prepaid');
+    }
+
     function getTotalRevenue(orders) {
-      // Revenue only from truly delivered orders
+      // Revenue from:
+      // 1. Truly delivered orders (COD: money received on delivery)
+      // 2. Prepaid orders from March 28+ (money received upfront on order placement)
       return orders
-        .filter(isOrderDelivered)
+        .filter(o => isOrderDelivered(o) || isOrderPrepaidRevenue(o))
         .reduce((sum, o) => {
           // If perfectly fulfilled, use total order value (includes discounts properly)
           if (o.fulfillment_status === 'fulfilled') {
@@ -2459,17 +2471,21 @@
         const allDayItems = [];
         dayOrders.forEach(o => {
           const isDel = categorizeOrders([o])['Delivered'] > 0;
-          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
+          const isPrepaidRev = isOrderPrepaidRevenue(o);
+          const isCountedForCost = isDel || isPrepaidRev;
+          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel || isPrepaidRev);
           if (o.line_items) {
             o.line_items.forEach(li => {
               const lookupKey = li.sku || ('TITLE:' + li.title);
-              allDayItems.push({ ...li, sku: lookupKey, isDelivered: isDel, isFulfilled: isFul });
+              allDayItems.push({ ...li, sku: lookupKey, isDelivered: isCountedForCost, isFulfilled: isFul });
             });
           }
         });
 
+        const prepaidCount = dayOrders.filter(isOrderPrepaidRevenue).length;
+        const revenueCount = deliveredCount + prepaidCount;
         const totalShopifySales = dayOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
-        const pl = calcPL(revenue, deliveredCount, adCost, fulfilledCount, allDayItems, totalShopifySales);
+        const pl = calcPL(revenue, revenueCount, adCost, fulfilledCount + prepaidCount, allDayItems, totalShopifySales);
 
         totalNet += pl.profit;
         
@@ -2530,20 +2546,26 @@
 
         
         // Collect all items for the day to calculate accurate P&L
+        // Prepaid orders (from March 28+) are treated like delivered orders for cost calculation
         const allDayItems = [];
         dayOrders.forEach(o => {
           const isDel = categorizeOrders([o])['Delivered'] > 0;
-          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
+          const isPrepaidRev = isOrderPrepaidRevenue(o);
+          const isCountedForCost = isDel || isPrepaidRev; // prepaid orders incur product cost too
+          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel || isPrepaidRev);
           if (o.line_items) {
             o.line_items.forEach(li => {
               const lookupKey = li.sku || ('TITLE:' + li.title);
-              allDayItems.push({ ...li, sku: lookupKey, isDelivered: isDel, isFulfilled: isFul });
+              allDayItems.push({ ...li, sku: lookupKey, isDelivered: isCountedForCost, isFulfilled: isFul });
             });
           }
         });
 
+        // For fallback calcPL cost estimation: count prepaid as delivered
+        const prepaidCount = dayOrders.filter(isOrderPrepaidRevenue).length;
+        const revenueCount = deliveredCount + prepaidCount;
         const totalShopifySales = dayOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
-        const pl = calcPL(revenue, deliveredCount, adCost, fulfilledCount, allDayItems, totalShopifySales);
+        const pl = calcPL(revenue, revenueCount, adCost, fulfilledCount + prepaidCount, allDayItems, totalShopifySales);
         const paymentCounts = getPaymentCounts(dayOrders);
 
         const prettyDate = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -2649,8 +2671,8 @@
                 <button class="inline-btn primary" id="btn-ad-${dateStr}">Save</button>
               </div>
             </div>
-            <div class="metric-card"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${paymentCounts.prepaid}</div></div>
-            <div class="metric-card"><div class="metric-label">Cash Orders</div><div class="metric-value" style="color:#fb923c">${paymentCounts.cash}</div></div>
+            ${(d >= new Date(PREPAID_LAUNCH_DATE + 'T00:00:00')) ? `<div class="metric-card"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${paymentCounts.prepaid}</div></div>` : ''}
+            ${(d >= new Date(PREPAID_LAUNCH_DATE + 'T00:00:00')) ? `<div class="metric-card"><div class="metric-label">Cash Orders</div><div class="metric-value" style="color:#fb923c">${paymentCounts.cash}</div></div>` : ''}
             <div class="metric-card"><div class="metric-label">Net Profit</div><div class="metric-value ${pl.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(pl.profit)}</div></div>
           </div>
 
@@ -2737,14 +2759,18 @@
         const dItems = [];
         dOrders.forEach(o => {
           const isDel = categorizeOrders([o])['Delivered'] > 0;
-          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
+          const isPrepaidRev = isOrderPrepaidRevenue(o);
+          const isCountedForCost = isDel || isPrepaidRev;
+          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel || isPrepaidRev);
           if (o.line_items) o.line_items.forEach(li => {
             const lookupKey = li.sku || ('TITLE:' + li.title);
-            dItems.push({...li, sku: lookupKey, isDelivered: isDel, isFulfilled: isFul});
+            dItems.push({...li, sku: lookupKey, isDelivered: isCountedForCost, isFulfilled: isFul});
           });
         });
+        const dPrepaid = dOrders.filter(isOrderPrepaidRevenue).length;
+        const dRevenueCount = dDel + dPrepaid;
         const dTotalSales = dOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
-        const dPL = calcPL(dRev, dDel, dAd, dFul, dItems, dTotalSales);
+        const dPL = calcPL(dRev, dRevenueCount, dAd, dFul + dPrepaid, dItems, dTotalSales);
 
         totalOrders += dOrders.length;
         totalRevenue += dRev;
@@ -2846,15 +2872,18 @@
 
         dOrders.forEach(o => {
           const isDel = categorizeOrders([o])['Delivered'] > 0;
-          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
-          if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
+          const isPrepaidRev = isOrderPrepaidRevenue(o);
+          const isCountedForCost = isDel || isPrepaidRev;
+          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel || isPrepaidRev);
+          if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isCountedForCost, isFulfilled: isFul}));
         });
+        const dPrepaidCnt = dOrders.filter(isOrderPrepaidRevenue).length;
         const dTotalSales = dOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
 
         totalOrders += dOrders.length;
         totalRevenue += dRev;
         totalDelivered += dDel;
-        totalFulfilled += dFul;
+        totalFulfilled += dFul + dPrepaidCnt;
         totalCanceled += tCounts['Canceled'] || 0;
         totalTransit += tCounts['In Transit'] || 0;
         totalRTO += tCounts['RTO'] || 0;
@@ -2867,7 +2896,8 @@
         totalCash += dPayment.cash;
       }
 
-      const mPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allItems, totalShopifySales);
+      const revenueDeliveredCount = totalDelivered + totalPrepaid;
+      const mPL = calcPL(totalRevenue, revenueDeliveredCount, totalAdCost, totalFulfilled, allItems, totalShopifySales);
       const mRet = getRetentionMetrics();
 
       document.getElementById('monthly-metrics').innerHTML = `
@@ -3000,11 +3030,15 @@
       const allItems = [];
       currentOrders.forEach(o => {
         const isDel = categorizeOrders([o])['Delivered'] > 0;
-        const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel);
-        if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isDel, isFulfilled: isFul}));
+        const isPrepaidRev = isOrderPrepaidRevenue(o);
+        const isCountedForCost = isDel || isPrepaidRev;
+        const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel || isPrepaidRev);
+        if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isCountedForCost, isFulfilled: isFul}));
       });
+      const totalPrepaid = currentOrders.filter(isOrderPrepaidRevenue).length;
+      const revenueDeliveredCount = totalDelivered + totalPrepaid;
       const totalShopifySales = currentOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
-      const atPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allItems, totalShopifySales);
+      const atPL = calcPL(totalRevenue, revenueDeliveredCount, totalAdCost, totalFulfilled + totalPrepaid, allItems, totalShopifySales);
       const atRet = getRetentionMetrics();
 
       const titleOverride = prefix === 'custom' ? 'Selected range' : 'Lifetime';
