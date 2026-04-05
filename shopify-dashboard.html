@@ -2581,9 +2581,15 @@
           const fn = (o.customer && o.customer.first_name) || '';
           const ln = (o.customer && o.customer.last_name) || '';
           const time = o.created_at ? new Date(o.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+          const isPrepaid = isOrderPrepaidRevenue(o);
+          const isOrderDeliv = isOrderDelivered(o);
+          const orderCountsForRevenue = isOrderDeliv || isPrepaid;
+          const paymentBadge = isPrepaid
+            ? `<span style="font-size:10px; font-weight:700; background:rgba(129,140,248,0.15); color:#818cf8; border:1px solid rgba(129,140,248,0.4); padding:2px 7px; border-radius:4px; margin-left:6px; vertical-align:middle;">PREPAID</span>`
+            : `<span style="font-size:10px; font-weight:700; background:rgba(251,146,60,0.15); color:#fb923c; border:1px solid rgba(251,146,60,0.4); padding:2px 7px; border-radius:4px; margin-left:6px; vertical-align:middle;">COD</span>`;
+          const paymentMethod = isPrepaid ? 'Prepaid' : 'COD';
           let itemsHtml = '';
           if (o.line_items && o.line_items.length > 0) {
-            const isOrderDeliv = isOrderDelivered(o);
             itemsHtml = '<div style="margin-top: 12px; font-size: 13px; color: var(--text-muted); background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px;">';
             
             o.line_items.forEach(li => {
@@ -2592,7 +2598,14 @@
               let statusText = '';
               let statusColor = 'var(--text-muted)';
               
-              if (o.fulfillment_status === 'fulfilled') {
+              if (isPrepaid && !isOrderDeliv) {
+                // Prepaid undelivered order — revenue counted upfront
+                revAdded = parseFloat(li.price) * li.quantity;
+                const fsStr = o.fulfillment_status || 'unfulfilled';
+                const deliveryStatus = fsStr === 'fulfilled' ? 'Shipped' : (fsStr === 'partial' && isItemFulfilled ? 'Shipped' : 'Pending');
+                statusText = `💳 Prepaid · ${deliveryStatus}`;
+                statusColor = '#818cf8';
+              } else if (o.fulfillment_status === 'fulfilled') {
                 revAdded = parseFloat(li.price) * li.quantity;
                 statusText = isOrderDeliv ? '✓ Delivered' : 'Fulfilled';
                 statusColor = isOrderDeliv ? 'var(--profit-color)' : 'var(--text-muted)';
@@ -2610,28 +2623,48 @@
                 statusText = fsStr.charAt(0).toUpperCase() + fsStr.slice(1);
               }
               
-              const showRev = isOrderDeliv && revAdded > 0;
-              const revHtml = showRev ? `<span style="color:var(--profit-color)">+${fmt(revAdded)}</span>` : `<span style="opacity: 0.5">-</span>`;
+              const showRev = orderCountsForRevenue && revAdded > 0;
+              const revHtml = showRev
+                ? `<span style="color:${isPrepaid && !isOrderDeliv ? '#818cf8' : 'var(--profit-color)'}">+${fmt(revAdded)}</span>`
+                : `<span style="opacity: 0.5">-</span>`;
               
               itemsHtml += `
                 <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;">
                   <span style="flex:1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 12px;">${li.quantity}x ${li.title}</span>
-                  <span style="width: 100px; text-align: left; color: ${statusColor}">${statusText}</span>
+                  <span style="width: 130px; text-align: left; color: ${statusColor}; font-size:12px;">${statusText}</span>
                   <span style="width: 80px; text-align: right; font-family: monospace;">${revHtml}</span>
                 </div>
               `;
             });
+
+            // Prepaid summary footer if not delivered
+            if (isPrepaid && !isOrderDeliv) {
+              itemsHtml += `
+                <div style="margin-top: 6px; padding: 6px 8px; background: rgba(129,140,248,0.08); border: 1px solid rgba(129,140,248,0.25); border-radius: 4px; font-size: 11px; color: #818cf8; display: flex; justify-content: space-between;">
+                  <span>💳 Prepaid revenue counted now (payment confirmed)</span>
+                  <span style="font-weight:700;">${fmt(parseFloat(o.total_price || 0))}</span>
+                </div>
+              `;
+            }
             itemsHtml += '</div>';
           }
+
+          // Revenue contribution for this order
+          const orderRevenue = orderCountsForRevenue ? parseFloat(o.total_price || 0) : 0;
+          const revenueHtml = orderCountsForRevenue
+            ? `<span style="color:${isPrepaid && !isOrderDeliv ? '#818cf8' : 'var(--profit-color)'}; font-weight:600;">${fmt(orderRevenue)}</span>`
+            : `<span style="color:var(--text-muted); opacity:0.5;">-</span>`;
 
           return `
             <tr>
               <td style="vertical-align: top; padding-top: 16px;">
-                <div style="font-weight: 500">${o.name}</div>
+                <div style="font-weight: 500; display:flex; align-items:center; gap:4px;">${o.name}${paymentBadge}</div>
                 ${itemsHtml}
               </td>
               <td style="vertical-align: top; padding-top: 16px;">${fn} ${ln}</td>
               <td style="vertical-align: top; padding-top: 16px;">${fmt(o.total_price)}</td>
+              <td style="vertical-align: top; padding-top: 16px; font-size:12px; color:var(--text-muted);">${paymentMethod}</td>
+              <td style="vertical-align: top; padding-top: 16px;">${revenueHtml}</td>
               <td style="vertical-align: top; padding-top: 16px;"><div class="order-tags">${tRender}</div></td>
               <td style="vertical-align: top; padding-top: 16px;">${time}</td>
             </tr>
@@ -2689,12 +2722,14 @@
                     <th>Order #</th>
                     <th>Customer</th>
                     <th>Amount</th>
+                    <th>Payment</th>
+                    <th>Revenue</th>
                     <th>Tags</th>
                     <th>Time</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${orderRows || '<tr><td colspan="5" style="text-align:center; color:var(--text-muted)">No orders this day</td></tr>'}
+                  ${orderRows || '<tr><td colspan="7" style="text-align:center; color:var(--text-muted)">No orders this day</td></tr>'}
                 </tbody>
               </table>
             </div>
