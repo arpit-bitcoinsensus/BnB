@@ -422,6 +422,8 @@
       <div class="controls-bar">
         <h2 style="margin:0; font-size:18px;">Product Pricing Management</h2>
         <div style="margin-left:auto; display:flex; gap:12px;">
+          <button id="btn-unhide-pricing" style="font-size:13px; display: none;">Unhide All</button>
+          <button id="btn-add-pricing" style="font-size:13px; background: rgba(52, 211, 153, 0.2); border-color: rgba(52, 211, 153, 0.5); color: #34d399;">+ Add Custom Product</button>
           <button id="btn-sync-pricing" style="font-size:13px;">Sync SKUs from Inventory</button>
           <button class="primary" id="btn-save-pricing">Save All Changes</button>
         </div>
@@ -1182,6 +1184,25 @@
       });
       document.getElementById('btn-save-pricing')?.addEventListener('click', savePricing);
       document.getElementById('btn-sync-pricing')?.addEventListener('click', syncPricingFromInventory);
+      
+      document.getElementById('btn-add-pricing')?.addEventListener('click', () => {
+        const skuTitle = prompt("Enter a Product Title for the new item:");
+        if (!skuTitle) return;
+        const lookupKey = `TITLE:${skuTitle}`; 
+        if (!state.productPricing[lookupKey]) {
+          state.productPricing[lookupKey] = { cp: 0, sp: 0, shipping: 0, title: skuTitle };
+          renderPricing();
+        } else {
+          alert('This product name already exists.');
+        }
+      });
+      document.getElementById('btn-unhide-pricing')?.addEventListener('click', () => {
+        if(confirm('Are you sure you want to unhide all hidden products?')) {
+          localStorage.removeItem('hiddenPricingSKUs');
+          window.hiddenPricingSKUs = new Set();
+          renderPricing();
+        }
+      });
     });
     function getWeekStart(d) {
       const day = d.getDay();
@@ -2291,15 +2312,29 @@
       }
     }
 
+    window.hiddenPricingSKUs = new Set(JSON.parse(localStorage.getItem('hiddenPricingSKUs') || '[]'));
+    window.toggleHidePricing = function(sku) {
+      window.hiddenPricingSKUs.add(sku);
+      localStorage.setItem('hiddenPricingSKUs', JSON.stringify([...window.hiddenPricingSKUs]));
+      renderPricing();
+    };
+
     function renderPricing() {
       const tbody = document.getElementById('pricing-tbody');
       if (!tbody) return;
       tbody.innerHTML = '';
 
-      const skus = Object.keys(state.productPricing).sort();
+      const unhiddenSkus = Object.keys(state.productPricing).filter(s => !(window.hiddenPricingSKUs && window.hiddenPricingSKUs.has(s)));
+      const skus = unhiddenSkus.sort();
       
+      const unhideBtn = document.getElementById('btn-unhide-pricing');
+      if(unhideBtn) {
+         const hasHidden = Object.keys(state.productPricing).length > unhiddenSkus.length;
+         unhideBtn.style.display = hasHidden ? 'inline-block' : 'none';
+      }
+
       if (skus.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted)">No products found. Sync from inventory to begin.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted)">No products visible. Add or Sync from inventory.</td></tr>';
         return;
       }
 
@@ -2314,7 +2349,12 @@
           <td data-label="Cost Price (CP)"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="cp" value="${p.cp}" style="width:120px;"></td>
           <td data-label="Selling Price (SP)"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="sp" value="${p.sp}" style="width:120px;"></td>
           <td data-label="Shipping/Fulfillment"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="shipping" value="${p.shipping}" style="width:120px;"></td>
-          <td data-label="Action"><button class="expand-btn" onclick="saveSinglePricing('${sku}')">Save</button></td>
+          <td data-label="Action">
+            <div style="display: flex; gap: 6px;">
+              <button class="expand-btn" onclick="saveSinglePricing('${sku}')">Save</button>
+              <button class="expand-btn" onclick="toggleHidePricing('${sku}')" style="color:var(--text-muted);" title="Hide temporarily from view">Hide</button>
+            </div>
+          </td>
         `;
         tbody.appendChild(row);
       });
