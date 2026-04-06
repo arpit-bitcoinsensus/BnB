@@ -2437,7 +2437,9 @@
         const mergeList = [...(invData || []), ...(orderItemsData || [])];
 
         mergeList.forEach(item => {
-          const lookupKey = item.sku || ('TITLE:' + item.title);
+          const tSku = typeof item.sku === 'string' ? item.sku.trim() : item.sku;
+          const tTitle = typeof item.title === 'string' ? item.title.trim() : item.title;
+          const lookupKey = tSku || ('TITLE:' + tTitle);
           if (!lookupKey) return;
           
           if (!state.productPricing[lookupKey]) {
@@ -2445,12 +2447,11 @@
               cp: 555,
               sp: 0,
               shipping: 135,
-              title: item.title
+              title: tTitle
             };
           } else {
-            // Keep existing pricing but update title if it was unknown
             if (!state.productPricing[lookupKey].title || state.productPricing[lookupKey].title === 'Unknown Product') {
-              state.productPricing[lookupKey].title = item.title;
+              state.productPricing[lookupKey].title = tTitle;
             }
           }
         });
