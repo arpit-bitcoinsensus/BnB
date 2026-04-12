@@ -2807,6 +2807,7 @@
         const totalShopifySales = dayOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
         const pl = calcPL(revenue, revenueCount, adCost, fulfilledCount + prepaidCount, allDayItems, totalShopifySales, deliveredCount);
         const paymentCounts = getPaymentCounts(dayOrders);
+        const revBreakdown = getRevenueBreakdown(dayOrders);
 
         const prettyDate = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
@@ -3069,6 +3070,8 @@
       const totalShopifySales = daysData.reduce((sum, d) => sum + d.totalSales, 0);
       const wPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allViewItems, totalShopifySales);
       const wRet = getRetentionMetrics();
+      const allWeekOrders = state.orders.filter(o => { const oDate = new Date(o.created_at); const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000)); const s = oIST.toISOString(); return s >= wStart.toISOString() && s <= wEnd.toISOString(); });
+      const wRevBreakdown = getRevenueBreakdown(allWeekOrders);
 
       document.getElementById('weekly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
@@ -3174,6 +3177,7 @@
       const revenueDeliveredCount = totalDelivered + totalPrepaid;
       const mPL = calcPL(totalRevenue, revenueDeliveredCount, totalAdCost, totalFulfilled, allItems, totalShopifySales, totalDelivered);
       const mRet = getRetentionMetrics();
+      const mRevBreakdown = getRevenueBreakdown(state.orders.filter(o => { const oDate = new Date(o.created_at); const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000)); return oIST >= mStart && oIST <= mEnd; }));
 
       document.getElementById('monthly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
@@ -3315,6 +3319,7 @@
       const totalShopifySales = currentOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
       const atPL = calcPL(totalRevenue, revenueDeliveredCount, totalAdCost, totalFulfilled + totalPrepaid, allItems, totalShopifySales, totalDelivered);
       const atRet = getRetentionMetrics();
+      const atRevBreakdown = getRevenueBreakdown(currentOrders);
 
       const titleOverride = prefix === 'custom' ? 'Selected range' : 'Lifetime';
 
