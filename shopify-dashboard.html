@@ -2915,7 +2915,7 @@
             </div>
             ${(d >= new Date(PREPAID_LAUNCH_DATE + 'T00:00:00')) ? `<div class="metric-card clickable glow-indigo" onclick="handleCardFilter('${dateStr}','prepaid',this)"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${paymentCounts.prepaid}</div></div>` : ''}
             ${(d >= new Date(PREPAID_LAUNCH_DATE + 'T00:00:00')) ? `<div class="metric-card clickable glow-amber"  onclick="handleCardFilter('${dateStr}','cash',this)"><div class="metric-label">Cash Orders</div><div class="metric-value" style="color:#fb923c">${paymentCounts.cash}</div></div>` : ''}
-            <div class="metric-card"><div class="metric-label">Net Profit</div><div class="metric-value ${pl.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(pl.profit)}</div></div>
+            <div class="metric-card clickable glow-white" onclick="showPLBreakdown('${encodeURIComponent(JSON.stringify(pl))}')"><div class="metric-label">Net Profit</div><div class="metric-value ${pl.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(pl.profit)}</div></div>
           </div>
 
           <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;" onclick="document.getElementById('orders-${dateStr}').style.display = document.getElementById('orders-${dateStr}').style.display === 'none' ? 'block' : 'none'">
@@ -3052,7 +3052,7 @@
             <button class="inline-btn primary" id="btn-ad-weekly-save">Save</button>
           </div>
         </div>
-        <div class="metric-card"><div class="metric-label">Net P&L</div><div class="metric-value ${wPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(wPL.profit)}</div></div>
+        <div class="metric-card clickable glow-white" onclick="showPLBreakdown('${encodeURIComponent(JSON.stringify(wPL))}')"><div class="metric-label">Net P&L</div><div class="metric-value ${wPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(wPL.profit)}</div></div>
       `;
 
       renderPLTable('weekly', wPL, totalDelivered);
@@ -3163,7 +3163,7 @@
             <button class="inline-btn primary" id="btn-ad-monthly-save">Save</button>
           </div>
         </div>
-        <div class="metric-card"><div class="metric-label">Net P&L</div><div class="metric-value ${mPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(mPL.profit)}</div></div>
+        <div class="metric-card clickable glow-white" onclick="showPLBreakdown('${encodeURIComponent(JSON.stringify(mPL))}')"><div class="metric-label">Net P&L</div><div class="metric-value ${mPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(mPL.profit)}</div></div>
       `;
 
       renderPLTable('monthly', mPL, totalDelivered);
@@ -3300,7 +3300,7 @@
             <button class="inline-btn primary" id="btn-ad-${prefix}-save">Save</button>
           </div>
         </div>
-        <div class="metric-card"><div class="metric-label">${titleOverride} Net P&L</div><div class="metric-value ${atPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(atPL.profit)}</div></div>
+        <div class="metric-card clickable glow-white" onclick="showPLBreakdown('${encodeURIComponent(JSON.stringify(atPL))}')"><div class="metric-label">${titleOverride} Net P&L</div><div class="metric-value ${atPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(atPL.profit)}</div></div>
       `;
 
       // Update Chart Count
@@ -3663,6 +3663,71 @@
       `;
     }
 
+    window.showPLBreakdown = function(plStr) {
+      const pl = JSON.parse(decodeURIComponent(plStr));
+      
+      const content = `
+        <div style="margin-bottom: 20px;">
+          <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color:var(--text-muted)">Revenue Counted</span> 
+            <span class="text-profit" style="font-weight:600;">${fmt(pl.revenue)}</span>
+          </div>
+          <div style="display:flex; justify-content: space-between; font-size: 13px;">
+            <span style="color:var(--text-muted)">Shopify Gross Sales</span> 
+            <span style="font-weight:600;">${fmt(pl.shopifyGrossSales)}</span>
+          </div>
+          <div style="font-size: 12px; color:var(--text-muted); margin-top: 8px; line-height: 1.4; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+            * Revenue is computed from Delivered Orders and Prepaid Orders only.
+          </div>
+        </div>
+
+        <div style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 10px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05);">
+          <h4 style="margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);">Costs Deduction</h4>
+          <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
+            <span>Product Costs (${pl.deliveredCount} delivered)</span> 
+            <span class="text-loss">${fmt(pl.productCost)}</span>
+          </div>
+          <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
+            <span>Shipping Costs (${pl.fulfilledCount} fulfilled)</span> 
+            <span class="text-loss">${fmt(pl.shippingCost)}</span>
+          </div>
+          <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
+            <span>Advertising Spend</span> 
+            <span class="text-loss">${fmt(pl.adCost)}</span>
+          </div>
+          <div style="display:flex; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); font-weight: 600; font-size: 15px;">
+            <span>Total Costs</span> 
+            <span class="text-loss">${fmt(pl.totalCost)}</span>
+          </div>
+        </div>
+        
+        <div style="display:flex; justify-content: space-between; align-items: center; padding: 16px; background: ${pl.profit >= 0 ? 'rgba(52, 211, 153, 0.1)' : 'rgba(248, 113, 113, 0.1)'}; border: 1px solid ${pl.profit >= 0 ? 'rgba(52, 211, 153, 0.3)' : 'rgba(248, 113, 113, 0.3)'}; border-radius: 10px;">
+          <span style="font-size: 18px; font-weight: 600;">Net Profit</span> 
+          <span class="${pl.profit >= 0 ? 'text-profit' : 'text-loss'}" style="font-size: 24px; font-weight: 700;">${fmt(pl.profit)}</span>
+        </div>
+        <div style="font-size: 12px; color:var(--text-muted); margin-top: 12px; text-align: center;">
+          Calculation: Revenue Counted &minus; Total Costs
+        </div>
+      `;
+      document.getElementById('pl-breakdown-content').innerHTML = content;
+      document.getElementById('pl-breakdown-modal').classList.add('active');
+    };
+
+    window.closePLBreakdown = function(e) {
+      if (e && e.target !== e.currentTarget) return; 
+      document.getElementById('pl-breakdown-modal').classList.remove('active');
+    };
+
   </script>
+
+  <div id="pl-breakdown-modal" class="modal-overlay" onclick="closePLBreakdown(event)">
+    <div class="modal glass" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin:0;">Net Profit Breakdown</h2>
+        <button onclick="closePLBreakdown()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 24px; padding: 0; line-height: 1;">&times;</button>
+      </div>
+      <div id="pl-breakdown-content"></div>
+    </div>
+  </div>
 </body>
 </html>
