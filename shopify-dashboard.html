@@ -2808,6 +2808,9 @@
         const pl = calcPL(revenue, revenueCount, adCost, fulfilledCount + prepaidCount, allDayItems, totalShopifySales, deliveredCount);
         const paymentCounts = getPaymentCounts(dayOrders);
         const revBreakdown = getRevenueBreakdown(dayOrders);
+        pl.deliveredRevenue = revBreakdown.deliveredRevenue;
+        pl.prepaidRevenue = revBreakdown.prepaidRevenue;
+        pl.prepaidCount = revBreakdown.prepaidCount;
 
         const prettyDate = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
@@ -3072,6 +3075,9 @@
       const wRet = getRetentionMetrics();
       const allWeekOrders = state.orders.filter(o => { const oDate = new Date(o.created_at); const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000)); const s = oIST.toISOString(); return s >= wStart.toISOString() && s <= wEnd.toISOString(); });
       const wRevBreakdown = getRevenueBreakdown(allWeekOrders);
+      wPL.deliveredRevenue = wRevBreakdown.deliveredRevenue;
+      wPL.prepaidRevenue = wRevBreakdown.prepaidRevenue;
+      wPL.prepaidCount = wRevBreakdown.prepaidCount;
 
       document.getElementById('weekly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
@@ -3178,6 +3184,9 @@
       const mPL = calcPL(totalRevenue, revenueDeliveredCount, totalAdCost, totalFulfilled, allItems, totalShopifySales, totalDelivered);
       const mRet = getRetentionMetrics();
       const mRevBreakdown = getRevenueBreakdown(state.orders.filter(o => { const oDate = new Date(o.created_at); const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000)); return oIST >= mStart && oIST <= mEnd; }));
+      mPL.deliveredRevenue = mRevBreakdown.deliveredRevenue;
+      mPL.prepaidRevenue = mRevBreakdown.prepaidRevenue;
+      mPL.prepaidCount = mRevBreakdown.prepaidCount;
 
       document.getElementById('monthly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
@@ -3320,6 +3329,9 @@
       const atPL = calcPL(totalRevenue, revenueDeliveredCount, totalAdCost, totalFulfilled + totalPrepaid, allItems, totalShopifySales, totalDelivered);
       const atRet = getRetentionMetrics();
       const atRevBreakdown = getRevenueBreakdown(currentOrders);
+      atPL.deliveredRevenue = atRevBreakdown.deliveredRevenue;
+      atPL.prepaidRevenue = atRevBreakdown.prepaidRevenue;
+      atPL.prepaidCount = atRevBreakdown.prepaidCount;
 
       const titleOverride = prefix === 'custom' ? 'Selected range' : 'Lifetime';
 
@@ -3702,13 +3714,36 @@
     window.showPLBreakdown = function(plStr) {
       const pl = JSON.parse(decodeURIComponent(plStr));
       
+      // Revenue sub-breakdown (if data available)
+      const hasPrepaidBreakdown = pl.deliveredRevenue !== undefined;
+      const revenueBreakdownHtml = hasPrepaidBreakdown ? `
+        <div style="margin-top: 10px; background: rgba(0,0,0,0.25); border-radius: 8px; padding: 10px 14px; border: 1px solid rgba(255,255,255,0.05);">
+          <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 8px;">Revenue Sources</div>
+          <div style="display:flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px;">
+            <span style="display:flex; align-items:center; gap:6px;">
+              <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#34d399;"></span>
+              Delivered COD (${pl.deliveredCount} orders)
+            </span>
+            <span class="text-profit">${fmt(pl.deliveredRevenue)}</span>
+          </div>
+          <div style="display:flex; justify-content: space-between; font-size: 13px;">
+            <span style="display:flex; align-items:center; gap:6px;">
+              <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#818cf8;"></span>
+              Prepaid (${pl.prepaidCount} orders)
+            </span>
+            <span style="color:#818cf8;">${fmt(pl.prepaidRevenue)}</span>
+          </div>
+        </div>
+      ` : '';
+      
       const content = `
         <div style="margin-bottom: 20px;">
           <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
             <span style="color:var(--text-muted)">Revenue Counted</span> 
             <span class="text-profit" style="font-weight:600;">${fmt(pl.revenue)}</span>
           </div>
-          <div style="display:flex; justify-content: space-between; font-size: 13px;">
+          ${revenueBreakdownHtml}
+          <div style="display:flex; justify-content: space-between; font-size: 13px; margin-top: 10px;">
             <span style="color:var(--text-muted)">Shopify Gross Sales</span> 
             <span style="font-weight:600;">${fmt(pl.shopifyGrossSales)}</span>
           </div>
