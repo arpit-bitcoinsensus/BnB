@@ -1438,14 +1438,16 @@
     function setupViewInputs() {
       const now = new Date();
       if (!document.getElementById('scoreboard-start-date').value) {
-        document.getElementById('scoreboard-start-date').value = '2026-02-25';
+        let d = new Date(now);
+        d.setDate(d.getDate() - 29);
+        document.getElementById('scoreboard-start-date').value = toDateStr(d);
       }
       if (!document.getElementById('scoreboard-end-date').value) {
         document.getElementById('scoreboard-end-date').value = toDateStr(now);
       }
       if (!document.getElementById('daily-start-date').value) {
         let d = new Date(now);
-        d.setDate(d.getDate() - 6);
+        d.setDate(d.getDate() - 29);
         document.getElementById('daily-start-date').value = toDateStr(d);
       }
       if (!document.getElementById('daily-end-date').value) {
