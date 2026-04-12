@@ -1685,27 +1685,56 @@
       return st.includes('prepaid');
     }
 
-    function getTotalRevenue(orders) {
-      // Revenue from:
-      // 1. Truly delivered orders (COD: money received on delivery)
-      // 2. Prepaid orders from March 28+ (money received upfront on order placement)
-      return orders
-        .filter(o => isOrderDelivered(o) || isOrderPrepaidRevenue(o))
-        .reduce((sum, o) => {
-          // If perfectly fulfilled, use total order value (includes discounts properly)
+    function getRevenueBreakdown(orders) {
+      let deliveredRev = 0;
+      let prepaidRev = 0;
+      let deliveredCount = 0;
+      let prepaidCount = 0;
+
+      orders.forEach(o => {
+        const isDel = isOrderDelivered(o);
+        const isPre = isOrderPrepaidRevenue(o);
+        
+        if (isDel || isPre) {
+          let orderRev = 0;
           if (o.fulfillment_status === 'fulfilled') {
-            return sum + parseFloat(o.total_price || 0);
-          }
-          // If partially fulfilled, only sum up the completed items
-          if (o.fulfillment_status === 'partial' && o.line_items && o.line_items.length > 0) {
+            orderRev = parseFloat(o.total_price || 0);
+          } else if (o.fulfillment_status === 'partial' && o.line_items && o.line_items.length > 0) {
             const fulfilledItems = o.line_items.filter(li => li.fulfillment_status === 'fulfilled');
             if (fulfilledItems.length > 0) {
-              return sum + fulfilledItems.reduce((s, li) => s + (parseFloat(li.price || 0) * parseInt(li.quantity || 1)), 0);
+              orderRev = fulfilledItems.reduce((s, li) => s + (parseFloat(li.price || 0) * parseInt(li.quantity || 1)), 0);
+            } else {
+              orderRev = parseFloat(o.total_price || 0);
             }
+          } else {
+            orderRev = parseFloat(o.total_price || 0);
           }
-          // Fallback (e.g. unfulfilled state or old data missing fulfillment_status)
-          return sum + parseFloat(o.total_price || 0);
-        }, 0);
+
+          if (isPre) {
+            prepaidRev += orderRev;
+            prepaidCount++;
+          } else if (isDel) {
+            deliveredRev += orderRev;
+            deliveredCount++;
+          }
+        }
+      });
+      
+      const totalRev = deliveredRev + prepaidRev;
+      const grossSales = orders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
+
+      return {
+        totalRevenue: totalRev,
+        deliveredRevenue: deliveredRev,
+        prepaidRevenue: prepaidRev,
+        deliveredCount,
+        prepaidCount,
+        shopifyGrossSales: grossSales
+      };
+    }
+
+    function getTotalRevenue(orders) {
+      return getRevenueBreakdown(orders).totalRevenue;
     }
 
     function calcPL(revenue, deliveredCount, adCost, fulfilledCount = 0, items = [], totalShopifyRevenue = 0, actualDeliveredCount = null) {
@@ -2907,7 +2936,7 @@
             ${(d >= new Date('2026-03-28T00:00:00')) ? `<div class="metric-card clickable glow-yellow" onclick="handleCardFilter('${dateStr}','rto-prediction',this)"><div class="metric-label">Possibility of RTO</div><div class="metric-value text-warning">${tagsCounts['RTO Prediction'] || 0}</div></div>` : ''}
             ${(d >= new Date('2026-02-25T00:00:00')) ? `<div class="metric-card clickable glow-red"    onclick="handleCardFilter('${dateStr}','rto',this)"><div class="metric-label">RTO / Undelivered</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>` : ''}
             <div class="metric-card clickable glow-yellow" onclick="handleCardFilter('${dateStr}','unreachable',this)"><div class="metric-label">Unreachable</div><div class="metric-value" style="color:#facc15">${tagsCounts['Unreachable'] || 0}</div></div>
-            <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
+            <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(revBreakdown))}')"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
             <div class="metric-card">
               <div class="metric-label">Ad Spend</div>
               <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
@@ -3046,7 +3075,7 @@
         <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${wRet.repeatRate}%</div></div>
-        <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
+        <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(wRevBreakdown))}')"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
         <div class="metric-card">
           <div class="metric-label">Ad Spend</div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
@@ -3157,7 +3186,7 @@
         ${(mEnd >= new Date('2026-02-25T00:00:00')) ? `<div class="metric-card"><div class="metric-label">RTO / Undelivered</div><div class="metric-value text-loss">${totalRTO}</div></div>` : ''}
         <div class="metric-card"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${totalPrepaid}</div></div>
         <div class="metric-card"><div class="metric-label">Cash Orders</div><div class="metric-value" style="color:#fb923c">${totalCash}</div></div>
-        <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
+        <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(mRevBreakdown))}')"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
         <div class="metric-card">
           <div class="metric-label">Ad Spend</div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
@@ -3294,7 +3323,7 @@
         <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${atRet.repeatRate}%</div></div>
-        <div class="metric-card"><div class="metric-label">${titleOverride} Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
+        <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(atRevBreakdown))}')"><div class="metric-label">${titleOverride} Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
         <div class="metric-card">
           <div class="metric-label">${titleOverride} Ad Spend</div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
@@ -3720,6 +3749,55 @@
       document.getElementById('pl-breakdown-modal').classList.remove('active');
     };
 
+    window.showRevenueBreakdown = function(revStr) {
+      const rev = JSON.parse(decodeURIComponent(revStr));
+      
+      const content = `
+        <div style="margin-bottom: 20px;">
+          <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color:var(--text-muted)">Shopify Gross Sales</span> 
+            <span style="font-weight:600;">${fmt(rev.shopifyGrossSales)}</span>
+          </div>
+          <div style="font-size: 12px; color:var(--text-muted); margin-top: 8px; line-height: 1.4; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+            * Shopify Gross Sales includes all orders placed, regardless of whether they were delivered, canceled, or returned.
+          </div>
+        </div>
+
+        <div style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 10px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05);">
+          <h4 style="margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);">Revenue Breakdown</h4>
+          <div style="display:flex; justify-content: space-between; margin-bottom: 12px;">
+            <span style="display: flex; align-items: center; gap: 8px;">
+              <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#34d399;"></span>
+              Delivered COD (${rev.deliveredCount} orders)
+            </span> 
+            <span class="text-profit" style="font-weight:600;">${fmt(rev.deliveredRevenue)}</span>
+          </div>
+          <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="display: flex; align-items: center; gap: 8px;">
+              <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#818cf8;"></span>
+              Prepaid Orders (${rev.prepaidCount} orders)
+            </span> 
+            <span style="color:#818cf8; font-weight:600;">${fmt(rev.prepaidRevenue)}</span>
+          </div>
+        </div>
+        
+        <div style="display:flex; justify-content: space-between; align-items: center; padding: 16px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 10px;">
+          <span style="font-size: 18px; font-weight: 600;">Total Net Revenue</span> 
+          <span style="color: #60a5fa; font-size: 24px; font-weight: 700;">${fmt(rev.totalRevenue)}</span>
+        </div>
+        <div style="font-size: 12px; color:var(--text-muted); margin-top: 12px; text-align: center;">
+          Calculation: Delivered COD + Prepaid Orders
+        </div>
+      `;
+      document.getElementById('revenue-breakdown-content').innerHTML = content;
+      document.getElementById('revenue-breakdown-modal').classList.add('active');
+    };
+
+    window.closeRevenueBreakdown = function(e) {
+      if (e && e.target !== e.currentTarget) return; 
+      document.getElementById('revenue-breakdown-modal').classList.remove('active');
+    };
+
   </script>
 
   <div id="pl-breakdown-modal" class="modal-overlay" onclick="closePLBreakdown(event)">
@@ -3729,6 +3807,16 @@
         <button onclick="closePLBreakdown()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 24px; padding: 0; line-height: 1;">&times;</button>
       </div>
       <div id="pl-breakdown-content"></div>
+    </div>
+  </div>
+
+  <div id="revenue-breakdown-modal" class="modal-overlay" onclick="closeRevenueBreakdown(event)">
+    <div class="modal glass" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin:0;">Revenue Breakdown</h2>
+        <button onclick="closeRevenueBreakdown()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 24px; padding: 0; line-height: 1;">&times;</button>
+      </div>
+      <div id="revenue-breakdown-content"></div>
     </div>
   </div>
 </body>
