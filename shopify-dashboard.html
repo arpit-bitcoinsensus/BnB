@@ -3740,100 +3740,117 @@
 
     window.showPLBreakdown = function(plStr) {
       const pl = JSON.parse(decodeURIComponent(plStr));
-      
-      // Revenue sub-breakdown (if data available)
-      const hasPrepaidBreakdown = pl.deliveredRevenue !== undefined;
-      const revenueBreakdownHtml = hasPrepaidBreakdown ? `
-        <div style="margin-top: 10px; background: rgba(0,0,0,0.25); border-radius: 8px; padding: 10px 14px; border: 1px solid rgba(255,255,255,0.05);">
-          <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 8px;">Revenue Sources</div>
-          <div style="display:flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px;">
-            <span style="display:flex; align-items:center; gap:6px;">
-              <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#34d399;"></span>
-              Delivered COD (${pl.deliveredCount} orders)
-            </span>
-            <span class="text-profit">${fmt(pl.deliveredRevenue)}</span>
-          </div>
-          <div style="display:flex; justify-content: space-between; font-size: 13px;">
-            <span style="display:flex; align-items:center; gap:6px;">
-              <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#818cf8;"></span>
-              Prepaid (${pl.prepaidCount} orders)
-            </span>
-            <span style="color:#818cf8;">${fmt(pl.prepaidRevenue)}</span>
-          </div>
-        </div>
-      ` : '';
-      
+
+      const grossProfit  = pl.revenue - pl.productCost;
+      const opExpenses   = pl.shippingCost + pl.adCost;
+      const grossMargin  = pl.revenue > 0 ? ((grossProfit / pl.revenue) * 100).toFixed(1) : 0;
+      const netMargin    = pl.revenue > 0 ? ((pl.profit   / pl.revenue) * 100).toFixed(1) : 0;
+
+      // ── html helpers ────────────────────────────────────────
+      const fmtLoss = v => '− ' + fmt(v);
+      const pnlRow = (label, value, cls='', sub='', indent=false) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;
+          padding:${indent ? '8px 16px 8px 28px' : '10px 16px'};
+          border-bottom:1px solid rgba(255,255,255,0.04);">
+          <span style="display:flex;flex-direction:column;">
+            <span style="font-size:${indent ? 13 : 14}px;color:${indent ? 'var(--text-muted)' : 'inherit'};">${label}</span>
+            ${sub ? `<span style="font-size:11px;color:var(--text-muted);margin-top:2px;">${sub}</span>` : ''}
+          </span>
+          <span class="${cls}" style="font-size:13px;font-weight:600;">${value}</span>
+        </div>`;
+
+      const sectionTitle = (title, total, cls='') => `
+        <div style="display:flex;justify-content:space-between;align-items:center;
+          padding:10px 16px;background:rgba(255,255,255,0.03);
+          border-bottom:1px solid rgba(255,255,255,0.07);">
+          <span style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700;">${title}</span>
+          <span class="${cls}" style="font-size:14px;font-weight:700;">${total}</span>
+        </div>`;
+
+      const subtotal = (label, value, cls='') => `
+        <div style="display:flex;justify-content:space-between;align-items:center;
+          padding:11px 16px;background:rgba(255,255,255,0.06);
+          border-bottom:1px solid rgba(255,255,255,0.08);border-top:1px solid rgba(255,255,255,0.06);">
+          <span style="font-size:14px;font-weight:700;color:white;">${label}</span>
+          <span class="${cls}" style="font-size:17px;font-weight:800;">${value}</span>
+        </div>`;
+
+      // ── COGS items table ─────────────────────────────────────
+      const hasItems = pl.itemsBreakdown && pl.itemsBreakdown.length > 0;
+      const cogsRows = hasItems
+        ? pl.itemsBreakdown.map(ib => `
+          <div style="display:flex;padding:8px 16px 8px 28px;border-bottom:1px solid rgba(255,255,255,0.03);font-size:13px;">
+            <span style="flex:3;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${ib.name}">${ib.name}</span>
+            <span style="flex:1;text-align:center;color:var(--primary);">${ib.qty} units</span>
+            <span style="flex:1;text-align:right;color:var(--text-muted);">${fmt(ib.cp)}</span>
+            <span style="flex:1;text-align:right;color:#f87171;font-weight:600;">${fmt(ib.totalCP)}</span>
+          </div>`).join('')
+        : `<div style="padding:10px 28px;color:var(--text-muted);font-size:13px;">Estimate used — no per-item data</div>`;
+
+      const cogsHeader = `
+        <div style="display:flex;padding:7px 16px 7px 28px;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid rgba(255,255,255,0.05);">
+          <span style="flex:3;">Product</span>
+          <span style="flex:1;text-align:center;">Units</span>
+          <span style="flex:1;text-align:right;">Cost/Unit</span>
+          <span style="flex:1;text-align:right;">Total</span>
+        </div>`;
+
+      const cogsNote = `
+        <div style="padding:7px 28px;font-size:11px;color:var(--text-muted);font-style:italic;border-top:1px solid rgba(255,255,255,0.03);">
+          * Units = product quantities from revenue-counted orders.
+            Each customer may pay a different sale price (online discount, express delivery etc.),
+            but the cost price per unit is fixed in your Pricing table.
+        </div>`;
+
       const content = `
-        <!-- TOP: REVENUE SUMMARY -->
-        <div style="margin-bottom: 24px;">
-          <h4 style="margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);">Total Revenue</h4>
-          <div style="display:flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px;">
-            <span style="font-size: 15px; font-weight: 600; color: white;">Revenue Counted</span> 
-            <span class="text-profit" style="font-size: 20px; font-weight: 700;">${fmt(pl.revenue)}</span>
-          </div>
-          ${revenueBreakdownHtml}
-          <div style="display:flex; justify-content: space-between; font-size: 13px; margin-top: 10px; padding: 0 8px;">
-            <span style="color:var(--text-muted)">Shopify Gross Sales</span> 
-            <span style="font-weight:600;">${fmt(pl.shopifyGrossSales)}</span>
-          </div>
+      <div style="overflow-y:auto;max-height:clamp(400px, 70vh, 680px);padding-right:2px;">
+
+        <!-- ① REVENUE ─────────────────────────────────────── -->
+        <div style="border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);margin-bottom:16px;">
+          ${sectionTitle('Revenue', fmt(pl.revenue), 'text-profit')}
+          ${pl.deliveredRevenue !== undefined ? `
+            ${pnlRow('Delivered COD', fmt(pl.deliveredRevenue), 'text-profit',
+              pl.deliveredCount + ' orders &middot; cash collected at delivery', true)}
+            ${pnlRow('Prepaid Online', fmt(pl.prepaidRevenue), '',
+              pl.prepaidCount + ' order' + (pl.prepaidCount !== 1 ? 's' : '') +
+              ' &middot; paid upfront (may include discount)', true)}
+          ` : ''}
+          ${pnlRow('Shopify Gross Sales', fmt(pl.shopifyGrossSales), '',
+            'all orders placed, incl. pending / canceled / RTO', true)}
         </div>
 
-        <!-- MIDDLE: DETAILED COSTS -->
-        <h4 style="margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);">Costs Breakdown</h4>
-        <div style="background: rgba(0,0,0,0.2); border-radius: 10px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05); overflow: hidden;">
-          
-          <!-- 1. Product Costs Table -->
-          <div style="padding: 12px 16px; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between;">
-            <span>Product Item Costs</span>
-            <span class="text-loss">${fmt(pl.productCost)}</span>
-          </div>
-          <div style="background: rgba(255,255,255,0.02); font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.05);">
-            <div style="display: flex; justify-content: space-between; padding: 8px 16px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
-              <span style="flex: 2;">Item Name</span>
-              <span style="flex: 1; text-align: right;">Price</span>
-              <span style="flex: 1; text-align: center;">Qty</span>
-              <span style="flex: 1; text-align: right;">Cost/Item</span>
-              <span style="flex: 1; text-align: right;">Total</span>
-            </div>
-            ${pl.itemsBreakdown && pl.itemsBreakdown.length > 0 ? 
-              pl.itemsBreakdown.map(ib => `
-                <div style="display: flex; justify-content: space-between; padding: 8px 16px; border-top: 1px solid rgba(255,255,255,0.02);">
-                  <span style="flex: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #ddd;" title="${ib.name}">${ib.name}</span>
-                  <span style="flex: 1; text-align: right; color: var(--text-muted);">${fmt(ib.price)}</span>
-                  <span style="flex: 1; text-align: center; color: var(--primary);">${ib.qty}x</span>
-                  <span style="flex: 1; text-align: right; color: var(--text-muted);">${fmt(ib.cp)}</span>
-                  <span style="flex: 1; text-align: right; color: #f87171;">${fmt(ib.totalCP)}</span>
-                </div>
-              `).join('') : '<div style="padding: 10px 16px; color: var(--text-muted); text-align: center;">No item breakdown available (fallback used)</div>'
-            }
-          </div>
+        <!-- ② COGS ─────────────────────────────────────────── -->
+        <div style="border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);margin-bottom:4px;">
+          ${sectionTitle('Cost of Goods Sold (COGS)', fmtLoss(pl.productCost), 'text-loss')}
+          ${cogsHeader}
+          ${cogsRows}
+          ${cogsNote}
+        </div>
 
-          <!-- 2. Shipping & Logistics -->
-          <div style="padding: 12px 16px; display: flex; justify-content: space-between; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.05);">
-            <span style="display: flex; flex-direction: column;">
-               Shipping Costs
-               <span style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-top: 2px;">Avg Cost &times; ${pl.fulfilledCount} Fulfilled</span>
-            </span> 
-            <span class="text-loss" style="align-self: center;">${fmt(pl.shippingCost)}</span>
-          </div>
+        <!-- ③ GROSS PROFIT ───────────────────────────────────── -->
+        ${subtotal('Gross Profit', fmt(grossProfit), grossProfit >= 0 ? 'text-profit' : 'text-loss')}
+        <div style="text-align:right;font-size:11px;color:var(--text-muted);margin-bottom:16px;padding-right:2px;">
+          Gross Margin: ${grossMargin}%
+        </div>
 
-          <!-- 3. Marketing -->
-          <div style="padding: 12px 16px; display: flex; justify-content: space-between; font-weight: 600;">
-            <span>Marketing Cost (Ad Spend)</span> 
-            <span class="text-loss">${fmt(pl.adCost)}</span>
-          </div>
+        <!-- ④ OPERATING EXPENSES ─────────────────────────────── -->
+        <div style="border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);margin-bottom:4px;">
+          ${sectionTitle('Operating Expenses', fmtLoss(opExpenses), 'text-loss')}
+          ${pnlRow('Shipping &amp; Logistics', fmtLoss(pl.shippingCost), 'text-loss',
+            pl.fulfilledCount + ' fulfilled orders &times; avg courier rate', true)}
+          ${pnlRow('Marketing / Ad Spend', fmtLoss(pl.adCost), 'text-loss',
+            'paid campaigns attributed to this period', true)}
         </div>
-        
-        <!-- BOTTOM: NET PROFIT -->
-        <h4 style="margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);">Net Profit Summary</h4>
-        <div style="display:flex; justify-content: space-between; align-items: center; padding: 16px; background: ${pl.profit >= 0 ? 'rgba(52, 211, 153, 0.1)' : 'rgba(248, 113, 113, 0.1)'}; border: 1px solid ${pl.profit >= 0 ? 'rgba(52, 211, 153, 0.3)' : 'rgba(248, 113, 113, 0.3)'}; border-radius: 10px; margin-bottom: 8px;">
-          <span style="font-size: 18px; font-weight: 600; color: white;">Final Net Profit</span> 
-          <span class="${pl.profit >= 0 ? 'text-profit' : 'text-loss'}" style="font-size: 26px; font-weight: 800;">${fmt(pl.profit)}</span>
+
+        <!-- ⑤ NET PROFIT ─────────────────────────────────────── -->
+        ${subtotal('Net Profit', fmt(pl.profit), pl.profit >= 0 ? 'text-profit' : 'text-loss')}
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);padding:6px 2px 2px 2px;">
+          <span>Net Margin: ${netMargin}%</span>
+          <span>Revenue &minus; COGS &minus; Shipping &minus; Marketing</span>
         </div>
-        <div style="font-size: 12px; color:var(--text-muted); text-align: center;">
-          Total Revenue &minus; Product Costs &minus; Shipping &minus; Marketing = Net Profit
-        </div>
-      `;
+
+      </div>`;
+
       document.getElementById('pl-breakdown-content').innerHTML = content;
       document.getElementById('pl-breakdown-modal').classList.add('active');
     };
