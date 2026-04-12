@@ -1757,6 +1757,8 @@
       let totalRevenue = revenue || 0; // Always trust the passed revenue as ground truth
       let shopifyGrossSales = totalShopifyRevenue || revenue || 0;
 
+      let itemMap = {};
+
       if (items && items.length > 0) {
         // Use items mainly for granular cost attribution
         items.forEach(item => {
@@ -1766,8 +1768,18 @@
           const isFulfilled = item.isFulfilled; 
           
           if (isDelivered) {
-             // We use the CP from Pricing Table, but we trust the 'revenue' argument for incoming money
              totalProductCost += (pricing.cp * item.quantity);
+             if (!itemMap[lookupKey]) {
+                itemMap[lookupKey] = {
+                  name: item.title || 'Unknown Product',
+                  price: parseFloat(item.price || 0),
+                  cp: pricing.cp,
+                  qty: 0,
+                  totalCP: 0
+                };
+             }
+             itemMap[lookupKey].qty += item.quantity;
+             itemMap[lookupKey].totalCP += (pricing.cp * item.quantity);
           }
           if (isFulfilled) {
             totalLogisticsCost += (pricing.shipping * item.quantity);
@@ -1802,7 +1814,8 @@
         // otherwise fall back to deliveredCount (which may include prepaid for cost calc)
         deliveredCount: actualDeliveredCount !== null ? actualDeliveredCount : deliveredCount, 
         fulfilledCount: fulfilledCount || deliveredCount,
-        shopifyGrossSales
+        shopifyGrossSales,
+        itemsBreakdown: Object.values(itemMap)
       };
     }
 
@@ -3751,47 +3764,74 @@
       ` : '';
       
       const content = `
-        <div style="margin-bottom: 20px;">
-          <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
-            <span style="color:var(--text-muted)">Revenue Counted</span> 
-            <span class="text-profit" style="font-weight:600;">${fmt(pl.revenue)}</span>
+        <!-- TOP: REVENUE SUMMARY -->
+        <div style="margin-bottom: 24px;">
+          <h4 style="margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);">Total Revenue</h4>
+          <div style="display:flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px;">
+            <span style="font-size: 15px; font-weight: 600; color: white;">Revenue Counted</span> 
+            <span class="text-profit" style="font-size: 20px; font-weight: 700;">${fmt(pl.revenue)}</span>
           </div>
           ${revenueBreakdownHtml}
-          <div style="display:flex; justify-content: space-between; font-size: 13px; margin-top: 10px;">
+          <div style="display:flex; justify-content: space-between; font-size: 13px; margin-top: 10px; padding: 0 8px;">
             <span style="color:var(--text-muted)">Shopify Gross Sales</span> 
             <span style="font-weight:600;">${fmt(pl.shopifyGrossSales)}</span>
           </div>
-          <div style="font-size: 12px; color:var(--text-muted); margin-top: 8px; line-height: 1.4; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px;">
-            * Revenue is computed from Delivered Orders and Prepaid Orders only.
-          </div>
         </div>
 
-        <div style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 10px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05);">
-          <h4 style="margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);">Costs Deduction</h4>
-          <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
-            <span>Product Costs (${pl.deliveredCount} delivered)</span> 
+        <!-- MIDDLE: DETAILED COSTS -->
+        <h4 style="margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);">Costs Breakdown</h4>
+        <div style="background: rgba(0,0,0,0.2); border-radius: 10px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05); overflow: hidden;">
+          
+          <!-- 1. Product Costs Table -->
+          <div style="padding: 12px 16px; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between;">
+            <span>Product Item Costs</span>
             <span class="text-loss">${fmt(pl.productCost)}</span>
           </div>
-          <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
-            <span>Shipping Costs (${pl.fulfilledCount} fulfilled)</span> 
-            <span class="text-loss">${fmt(pl.shippingCost)}</span>
+          <div style="background: rgba(255,255,255,0.02); font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div style="display: flex; justify-content: space-between; padding: 8px 16px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
+              <span style="flex: 2;">Item Name</span>
+              <span style="flex: 1; text-align: right;">Price</span>
+              <span style="flex: 1; text-align: center;">Qty</span>
+              <span style="flex: 1; text-align: right;">Cost/Item</span>
+              <span style="flex: 1; text-align: right;">Total</span>
+            </div>
+            ${pl.itemsBreakdown && pl.itemsBreakdown.length > 0 ? 
+              pl.itemsBreakdown.map(ib => `
+                <div style="display: flex; justify-content: space-between; padding: 8px 16px; border-top: 1px solid rgba(255,255,255,0.02);">
+                  <span style="flex: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #ddd;" title="${ib.name}">${ib.name}</span>
+                  <span style="flex: 1; text-align: right; color: var(--text-muted);">${fmt(ib.price)}</span>
+                  <span style="flex: 1; text-align: center; color: var(--primary);">${ib.qty}x</span>
+                  <span style="flex: 1; text-align: right; color: var(--text-muted);">${fmt(ib.cp)}</span>
+                  <span style="flex: 1; text-align: right; color: #f87171;">${fmt(ib.totalCP)}</span>
+                </div>
+              `).join('') : '<div style="padding: 10px 16px; color: var(--text-muted); text-align: center;">No item breakdown available (fallback used)</div>'
+            }
           </div>
-          <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
-            <span>Advertising Spend</span> 
+
+          <!-- 2. Shipping & Logistics -->
+          <div style="padding: 12px 16px; display: flex; justify-content: space-between; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <span style="display: flex; flex-direction: column;">
+               Shipping Costs
+               <span style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-top: 2px;">Avg Cost &times; ${pl.fulfilledCount} Fulfilled</span>
+            </span> 
+            <span class="text-loss" style="align-self: center;">${fmt(pl.shippingCost)}</span>
+          </div>
+
+          <!-- 3. Marketing -->
+          <div style="padding: 12px 16px; display: flex; justify-content: space-between; font-weight: 600;">
+            <span>Marketing Cost (Ad Spend)</span> 
             <span class="text-loss">${fmt(pl.adCost)}</span>
-          </div>
-          <div style="display:flex; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); font-weight: 600; font-size: 15px;">
-            <span>Total Costs</span> 
-            <span class="text-loss">${fmt(pl.totalCost)}</span>
           </div>
         </div>
         
-        <div style="display:flex; justify-content: space-between; align-items: center; padding: 16px; background: ${pl.profit >= 0 ? 'rgba(52, 211, 153, 0.1)' : 'rgba(248, 113, 113, 0.1)'}; border: 1px solid ${pl.profit >= 0 ? 'rgba(52, 211, 153, 0.3)' : 'rgba(248, 113, 113, 0.3)'}; border-radius: 10px;">
-          <span style="font-size: 18px; font-weight: 600;">Net Profit</span> 
-          <span class="${pl.profit >= 0 ? 'text-profit' : 'text-loss'}" style="font-size: 24px; font-weight: 700;">${fmt(pl.profit)}</span>
+        <!-- BOTTOM: NET PROFIT -->
+        <h4 style="margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);">Net Profit Summary</h4>
+        <div style="display:flex; justify-content: space-between; align-items: center; padding: 16px; background: ${pl.profit >= 0 ? 'rgba(52, 211, 153, 0.1)' : 'rgba(248, 113, 113, 0.1)'}; border: 1px solid ${pl.profit >= 0 ? 'rgba(52, 211, 153, 0.3)' : 'rgba(248, 113, 113, 0.3)'}; border-radius: 10px; margin-bottom: 8px;">
+          <span style="font-size: 18px; font-weight: 600; color: white;">Final Net Profit</span> 
+          <span class="${pl.profit >= 0 ? 'text-profit' : 'text-loss'}" style="font-size: 26px; font-weight: 800;">${fmt(pl.profit)}</span>
         </div>
-        <div style="font-size: 12px; color:var(--text-muted); margin-top: 12px; text-align: center;">
-          Calculation: Revenue Counted &minus; Total Costs
+        <div style="font-size: 12px; color:var(--text-muted); text-align: center;">
+          Total Revenue &minus; Product Costs &minus; Shipping &minus; Marketing = Net Profit
         </div>
       `;
       document.getElementById('pl-breakdown-content').innerHTML = content;
