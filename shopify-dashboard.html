@@ -1708,7 +1708,7 @@
         }, 0);
     }
 
-    function calcPL(revenue, deliveredCount, adCost, fulfilledCount = 0, items = [], totalShopifyRevenue = 0) {
+    function calcPL(revenue, deliveredCount, adCost, fulfilledCount = 0, items = [], totalShopifyRevenue = 0, actualDeliveredCount = null) {
       let totalProductCost = 0;
       let totalLogisticsCost = 0;
       let totalRevenue = revenue || 0; // Always trust the passed revenue as ground truth
@@ -1755,7 +1755,9 @@
         adCost, 
         totalCost, 
         profit, 
-        deliveredCount, 
+        // Use actualDeliveredCount (pure Delivered orders) for display if provided,
+        // otherwise fall back to deliveredCount (which may include prepaid for cost calc)
+        deliveredCount: actualDeliveredCount !== null ? actualDeliveredCount : deliveredCount, 
         fulfilledCount: fulfilledCount || deliveredCount,
         shopifyGrossSales
       };
@@ -2694,7 +2696,7 @@
         const prepaidCount = dayOrders.filter(isOrderPrepaidRevenue).length;
         const revenueCount = deliveredCount + prepaidCount;
         const totalShopifySales = dayOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
-        const pl = calcPL(revenue, revenueCount, adCost, fulfilledCount + prepaidCount, allDayItems, totalShopifySales);
+        const pl = calcPL(revenue, revenueCount, adCost, fulfilledCount + prepaidCount, allDayItems, totalShopifySales, deliveredCount);
 
         totalNet += pl.profit;
         
@@ -2774,7 +2776,7 @@
         const prepaidCount = dayOrders.filter(isOrderPrepaidRevenue).length;
         const revenueCount = deliveredCount + prepaidCount;
         const totalShopifySales = dayOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
-        const pl = calcPL(revenue, revenueCount, adCost, fulfilledCount + prepaidCount, allDayItems, totalShopifySales);
+        const pl = calcPL(revenue, revenueCount, adCost, fulfilledCount + prepaidCount, allDayItems, totalShopifySales, deliveredCount);
         const paymentCounts = getPaymentCounts(dayOrders);
 
         const prettyDate = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -3141,7 +3143,7 @@
       }
 
       const revenueDeliveredCount = totalDelivered + totalPrepaid;
-      const mPL = calcPL(totalRevenue, revenueDeliveredCount, totalAdCost, totalFulfilled, allItems, totalShopifySales);
+      const mPL = calcPL(totalRevenue, revenueDeliveredCount, totalAdCost, totalFulfilled, allItems, totalShopifySales, totalDelivered);
       const mRet = getRetentionMetrics();
 
       document.getElementById('monthly-metrics').innerHTML = `
@@ -3282,7 +3284,7 @@
       const totalPrepaid = currentOrders.filter(isOrderPrepaidRevenue).length;
       const revenueDeliveredCount = totalDelivered + totalPrepaid;
       const totalShopifySales = currentOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
-      const atPL = calcPL(totalRevenue, revenueDeliveredCount, totalAdCost, totalFulfilled + totalPrepaid, allItems, totalShopifySales);
+      const atPL = calcPL(totalRevenue, revenueDeliveredCount, totalAdCost, totalFulfilled + totalPrepaid, allItems, totalShopifySales, totalDelivered);
       const atRet = getRetentionMetrics();
 
       const titleOverride = prefix === 'custom' ? 'Selected range' : 'Lifetime';
