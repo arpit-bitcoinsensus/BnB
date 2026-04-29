@@ -477,7 +477,10 @@
             <div id="scoreboard-net-profit" style="font-size: 36px; font-weight: 700; margin-top: 8px;">₹0</div>
             <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="scoreboard-date-range">...</div>
           </div>
-          <div style="text-align: right;">
+          <div style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
+            <button id="btn-toggle-cpp" style="display: none; background: rgba(167, 139, 250, 0.1); border: 1px solid #a78bfa; padding: 8px 16px; border-radius: 8px; color: #a78bfa; cursor: pointer; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; transition: all 0.2s ease;">
+              Show CPP
+            </button>
             <button id="btn-toggle-breakdown" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border); padding: 8px 16px; border-radius: 8px; color: white; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;">
               View Breakdown <span id="breakdown-icon">▼</span>
             </button>
@@ -1048,13 +1051,24 @@
       document.getElementById('btn-toggle-breakdown')?.addEventListener('click', () => {
         const breakdown = document.getElementById('scoreboard-breakdown');
         const icon = document.getElementById('breakdown-icon');
+        const btnCpp = document.getElementById('btn-toggle-cpp');
         if(breakdown.style.display === 'none') {
           breakdown.style.display = 'block';
+          if(btnCpp) btnCpp.style.display = 'flex';
           icon.textContent = '▲';
         } else {
           breakdown.style.display = 'none';
+          if(btnCpp) btnCpp.style.display = 'none';
           icon.textContent = '▼';
         }
+      });
+      document.getElementById('btn-toggle-cpp')?.addEventListener('click', () => {
+        const cppEls = document.querySelectorAll('.breakdown-cpp');
+        const btn = document.getElementById('btn-toggle-cpp');
+        const isHidden = cppEls.length > 0 && cppEls[0].style.display === 'none';
+        cppEls.forEach(el => el.style.display = isHidden ? 'block' : 'none');
+        btn.textContent = isHidden ? 'Hide CPP' : 'Show CPP';
+        btn.style.background = isHidden ? 'rgba(167, 139, 250, 0.2)' : 'rgba(167, 139, 250, 0.1)';
       });
       document.getElementById('btn-login')?.addEventListener('click', handleLogin);
       document.getElementById('passcode-input')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
@@ -2760,9 +2774,16 @@
         totalNet += pl.profit;
         
         if (dayOrders.length > 0 || pl.profit !== 0) {
+          let totalItemsCount = 0;
+          dayOrders.forEach(o => {
+            if (o.line_items) o.line_items.forEach(li => totalItemsCount += parseInt(li.quantity || 1));
+          });
+          const cpp = totalItemsCount > 0 ? (adCost / totalItemsCount) : 0;
+          
           dayData.push({
             date: new Date(d),
-            profit: pl.profit
+            profit: pl.profit,
+            cpp: cpp
           });
           if (pl.profit > 0 && pl.profit > maxProfit) maxProfit = pl.profit;
           if (pl.profit < 0 && Math.abs(pl.profit) > maxLoss) maxLoss = Math.abs(pl.profit);
@@ -2791,13 +2812,22 @@
           borderColor = `rgba(239, 68, 68, ${opacity + 0.3})`;
         }
         
+        const cppText = `CPP: ₹${fmt(data.cpp)}`;
+        
         breakdownHtml += `
           <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 16px; background: ${bgColor}; border-radius: 12px; border: 1px solid ${borderColor}; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s; cursor: default;">
             <span style="color: rgba(255,255,255,0.9); font-weight: 600; font-size: 13px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">${prettyDate}</span>
             <span style="color: ${isProfit ? '#a7f3d0' : '#fecaca'}; font-weight: 700; font-size: 18px; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${profitText}</span>
+            <span class="breakdown-cpp" style="display: none; color: #e2e8f0; font-size: 11px; margin-top: 8px; padding: 2px 6px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); letter-spacing: 0.5px; font-weight: 500;">${cppText}</span>
           </div>
         `;
       });
+
+      const btnCpp = document.getElementById('btn-toggle-cpp');
+      if (btnCpp) {
+        btnCpp.textContent = 'Show CPP';
+        btnCpp.style.background = 'rgba(167, 139, 250, 0.1)';
+      }
 
       document.getElementById('daily-scoreboard').style.display = 'block';
       const netColor = totalNet >= 0 ? 'var(--profit-color)' : 'var(--loss-color)';
