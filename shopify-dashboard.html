@@ -485,7 +485,7 @@
         </div>
         
         <div id="scoreboard-breakdown" style="display: none; margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 24px; animation: fadeIn 0.3s ease;">
-          <div id="scoreboard-breakdown-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto;">
+          <div id="scoreboard-breakdown-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; max-height: 350px; overflow-y: auto; padding-right: 8px; padding-bottom: 8px;">
             <!-- Rendered by JS -->
           </div>
         </div>
@@ -2719,6 +2719,9 @@
     function renderScoreboard(dStart, dEnd, orders = state.orders, adCostsMap = state.adCosts) {
       let totalNet = 0;
       let breakdownHtml = '';
+      const dayData = [];
+      let maxProfit = 0;
+      let maxLoss = 0;
       
       // Iterate over each day from newest to oldest
       for (var d = new Date(dEnd); d >= dStart; d.setDate(d.getDate() - 1)) {
@@ -2756,20 +2759,45 @@
 
         totalNet += pl.profit;
         
-        // Build breakdown row
         if (dayOrders.length > 0 || pl.profit !== 0) {
-          const prettyDate = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
-          const profitText = pl.profit >= 0 ? `net profit is ${fmt(pl.profit)}` : `net loss is ${fmt(Math.abs(pl.profit))}`;
-          const colorClass = pl.profit >= 0 ? 'var(--profit-color)' : 'var(--loss-color)';
-          
-          breakdownHtml += `
-            <div style="display: flex; justify-content: space-between; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
-              <span style="color: var(--text-main); font-weight: 500;">${prettyDate}</span>
-              <span style="color: ${colorClass}; font-weight: 700;">${profitText}</span>
-            </div>
-          `;
+          dayData.push({
+            date: new Date(d),
+            profit: pl.profit
+          });
+          if (pl.profit > 0 && pl.profit > maxProfit) maxProfit = pl.profit;
+          if (pl.profit < 0 && Math.abs(pl.profit) > maxLoss) maxLoss = Math.abs(pl.profit);
         }
       }
+
+      // Build breakdown tiles
+      dayData.forEach(data => {
+        const prettyDate = data.date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+        const isProfit = data.profit >= 0;
+        const profitText = isProfit ? `+${fmt(data.profit)}` : `-${fmt(Math.abs(data.profit))}`;
+        
+        let opacity = 0.1;
+        let bgColor = '';
+        let borderColor = '';
+        
+        if (isProfit) {
+          // Dynamic green intensity
+          opacity = maxProfit > 0 ? 0.15 + (0.5 * (data.profit / maxProfit)) : 0.2;
+          bgColor = `rgba(16, 185, 129, ${opacity})`;
+          borderColor = `rgba(16, 185, 129, ${opacity + 0.3})`;
+        } else {
+          // Dynamic red intensity
+          opacity = maxLoss > 0 ? 0.15 + (0.5 * (Math.abs(data.profit) / maxLoss)) : 0.2;
+          bgColor = `rgba(239, 68, 68, ${opacity})`;
+          borderColor = `rgba(239, 68, 68, ${opacity + 0.3})`;
+        }
+        
+        breakdownHtml += `
+          <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 16px; background: ${bgColor}; border-radius: 12px; border: 1px solid ${borderColor}; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s; cursor: default;">
+            <span style="color: rgba(255,255,255,0.9); font-weight: 600; font-size: 13px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">${prettyDate}</span>
+            <span style="color: ${isProfit ? '#a7f3d0' : '#fecaca'}; font-weight: 700; font-size: 18px; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${profitText}</span>
+          </div>
+        `;
+      });
 
       document.getElementById('daily-scoreboard').style.display = 'block';
       const netColor = totalNet >= 0 ? 'var(--profit-color)' : 'var(--loss-color)';
