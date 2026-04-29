@@ -2859,17 +2859,17 @@
       
       const avgCpp = totalItemsRange > 0 ? (totalAdCostRange / totalItemsRange) : 0;
       document.getElementById('scoreboard-stats').innerHTML = `
-        <div style="background: rgba(167, 139, 250, 0.1); border: 1px solid rgba(167, 139, 250, 0.3); padding: 8px 14px; border-radius: 8px;">
-          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Avg CPP</div>
-          <div style="font-size: 15px; font-weight: 700; color: #a78bfa;">₹${fmt(avgCpp)}</div>
+        <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); padding: 10px 16px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); backdrop-filter: blur(4px);">
+          <div style="font-size: 11px; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600;">Avg CPP</div>
+          <div style="font-size: 18px; font-weight: 700; color: #38bdf8; text-shadow: 0 0 10px rgba(56, 189, 248, 0.3);">${fmt(avgCpp)}</div>
         </div>
-        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 8px 14px; border-radius: 8px;">
-          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Profitable Days (${profitDaysCount})</div>
-          <div style="font-size: 15px; font-weight: 700; color: var(--profit-color);">+${fmt(profitDaysAmount)}</div>
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 10px 16px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); backdrop-filter: blur(4px);">
+          <div style="font-size: 11px; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600;">Profitable Days (${profitDaysCount})</div>
+          <div style="font-size: 18px; font-weight: 700; color: var(--profit-color); text-shadow: 0 0 10px rgba(16, 185, 129, 0.2);">+${fmt(profitDaysAmount)}</div>
         </div>
-        <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px 14px; border-radius: 8px;">
-          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Loss Days (${lossDaysCount})</div>
-          <div style="font-size: 15px; font-weight: 700; color: var(--loss-color);">-${fmt(Math.abs(lossDaysAmount))}</div>
+        <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px 16px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); backdrop-filter: blur(4px);">
+          <div style="font-size: 11px; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600;">Loss Days (${lossDaysCount})</div>
+          <div style="font-size: 18px; font-weight: 700; color: var(--loss-color); text-shadow: 0 0 10px rgba(239, 68, 68, 0.2);">-${fmt(Math.abs(lossDaysAmount))}</div>
         </div>
       `;
       
