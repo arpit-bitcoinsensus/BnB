@@ -2957,6 +2957,7 @@
           <div class="day-header">
             <h2>${prettyDate}</h2>
             <div class="day-actions">
+              <span class="badge" style="font-size: 14px; background: rgba(167, 139, 250, 0.2); color: #a78bfa; border: 1px solid #a78bfa;">CPP: ${totalItemsCount > 0 ? fmt(adCost / totalItemsCount) : '₹0'}</span>
               <span class="badge" style="font-size: 14px; background: ${pl.profit >= 0 ? 'rgba(52, 211, 153, 0.2)' : 'rgba(248, 113, 113, 0.2)'}; color: ${pl.profit >= 0 ? 'var(--profit-color)' : 'var(--loss-color)'}; border: 1px solid ${pl.profit >= 0 ? 'var(--profit-color)' : 'var(--loss-color)'};">Net: ${profitChar}${fmt(Math.abs(pl.profit))}</span>
             </div>
           </div>
@@ -2964,6 +2965,7 @@
           <div class="metrics-grid" style="margin-bottom: 24px;">
             <div class="metric-card clickable glow-white"  onclick="handleCardFilter('${dateStr}','orders',this)"><div class="metric-label">Orders</div><div class="metric-value">${dayOrders.length}</div></div>
             <div class="metric-card glow-white"><div class="metric-label">Number of Items</div><div class="metric-value">${totalItemsCount}</div></div>
+            <div class="metric-card glow-white"><div class="metric-label">CPP</div><div class="metric-value">${totalItemsCount > 0 ? fmt(adCost / totalItemsCount) : '₹0'}</div></div>
             <div class="metric-card clickable glow-green"  onclick="handleCardFilter('${dateStr}','fulfilled',this)"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${tagsCounts['Fulfilled'] || 0}</div></div>
             <div class="metric-card clickable glow-green"  onclick="handleCardFilter('${dateStr}','delivered',this)"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${deliveredCount}</div></div>
             <div class="metric-card clickable glow-blue"   onclick="handleCardFilter('${dateStr}','in-transit',this)"><div class="metric-label">In Transit</div><div class="metric-value" style="color:#60a5fa">${tagsCounts['In Transit'] || 0}</div></div>
