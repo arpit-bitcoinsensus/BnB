@@ -2062,7 +2062,8 @@
     // Fetch Orchestrator
     async function fetchCurrentView(isForce = false) {
 
-      showLoading('Syncing and loading orders...');
+      if (isForce) showLoading('Syncing and loading orders...');
+      else showLoading('Loading...');
 
       try {
         let minDate, maxDate, dbMin, dbMax;
@@ -2071,42 +2072,28 @@
           const startDateStr = document.getElementById('sheet-start-date').value;
           const endDateStr = document.getElementById('sheet-end-date').value;
           dbMin = startDateStr; dbMax = endDateStr;
-          minDate = new Date(startDateStr + 'T00:00:00+05:30').toISOString();
-          maxDate = new Date(endDateStr + 'T23:59:59+05:30').toISOString();
         } else if (state.view === 'products') {
           const startDateStr = document.getElementById('products-start-date').value;
           const endDateStr = document.getElementById('products-end-date').value;
           dbMin = startDateStr; dbMax = endDateStr;
-          minDate = new Date(startDateStr + 'T00:00:00+05:30').toISOString();
-          maxDate = new Date(endDateStr + 'T23:59:59+05:30').toISOString();
         } else if (state.view === 'daily') {
           const startDateStr = document.getElementById('daily-start-date').value;
           const endDateStr = document.getElementById('daily-end-date').value;
           dbMin = startDateStr; dbMax = endDateStr;
-          minDate = new Date(startDateStr + 'T00:00:00+05:30').toISOString();
-          maxDate = new Date(endDateStr + 'T23:59:59+05:30').toISOString();
         } else if (state.view === 'weekly') {
           const wDate = new Date(document.getElementById('weekly-date').value);
           const wStart = getWeekStart(wDate);
           const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate() + 6);
           dbMin = toDateStr(wStart); dbMax = toDateStr(wEnd);
-          minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
-          maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
         } else if (state.view === 'monthly') {
           const y = parseInt(document.getElementById('monthly-year').value);
           const m = parseInt(document.getElementById('monthly-month').value);
           const mStart = new Date(y, m, 1);
           const mEnd = new Date(y, m + 1, 0);
           dbMin = toDateStr(mStart); dbMax = toDateStr(mEnd);
-          minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
-          maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
         } else if (state.view === 'custom') {
           dbMin = document.getElementById('custom-from').value;
           dbMax = document.getElementById('custom-to').value;
-          if (dbMin && dbMax) {
-            minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
-            maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
-          }
         } else if (state.view === 'all-time') {
           const customFrom = document.getElementById('all-time-from').value;
           const customTo = document.getElementById('all-time-to').value;
@@ -2117,19 +2104,14 @@
             dbMin = STORE_LAUNCH_DATE; 
             dbMax = toDateStr(new Date());
           }
-          minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
-          maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
         } else if (state.view === 'analytics') {
           dbMin = document.getElementById('analytics-start-date').value;
           dbMax = document.getElementById('analytics-end-date').value;
-          if (dbMin && dbMax) {
-            minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
-            maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
-          }
         }
 
         if (!dbMin || !dbMax) {
           console.warn("No date range for view:", state.view);
+          hideLoading();
           return;
         }
 
@@ -2137,53 +2119,73 @@
         minDate = new Date(dbMin + 'T00:00:00+05:30').toISOString();
         maxDate = new Date(dbMax + 'T23:59:59+05:30').toISOString();
 
-        // 1. Sync missing data from Shopify into Supabase
-        try {
-          if (state.view === 'sheet' || state.view === 'products') {
-            await syncInventory();
-          }
-          await syncShopifyToSupabase(minDate, maxDate, isForce);
-        } catch(e) {
-          log("Shopify sync failed: " + e.message);
-        }
-        // 2. Fetch everything locally from Supabase
-        // For All-Time/Custom, we fetch double the range to support comparison chart
+        // 1. Fetch everything locally from Supabase IMMEDIATELY for fast UI render
         let fetchMin = minDate;
         if (state.view === 'all-time' || state.view === 'custom') {
            const duration = new Date(maxDate).getTime() - new Date(minDate).getTime();
            const prevMin = new Date(new Date(minDate).getTime() - duration - 1000); // extra buffer
            fetchMin = prevMin.toISOString();
         }
+        
         state.orders = await fetchOrdersFromSupabase(fetchMin, maxDate);
-        // 3. Load Ad Spend from Supabase
         await loadAdCosts(dbMin, dbMax);
 
-        // Render matching UI
-        if (state.view === 'sheet') {
-          await renderStockAlerts();
-          renderSheet();
-        }
-        else if (state.view === 'products') renderProducts(minDate, maxDate);
-        else if (state.view === 'daily') {
-          renderDaily(new Date(minDate), new Date(maxDate));
-          const sStart = document.getElementById('scoreboard-start-date').value;
-          const sEnd = document.getElementById('scoreboard-end-date').value;
-          if (sStart && sEnd) renderScoreboard(new Date(sStart), new Date(sEnd));
-        }
-        else if (state.view === 'weekly') renderWeekly(new Date(minDate), new Date(maxDate));
-        else if (state.view === 'monthly') renderMonthly(new Date(minDate), new Date(maxDate));
-        else if (state.view === 'all-time') renderAllTime(new Date(minDate), new Date(maxDate), 'all-time');
-        else if (state.view === 'analytics') renderAnalytics(minDate, maxDate);
-        
-        // Auto-update Intelligence if open
-        if (document.getElementById('intel-drawer').classList.contains('active')) {
-          updateIntelligence();
+        // 2. Render UI helper
+        const renderUI = async () => {
+          if (state.view === 'sheet') {
+            await renderStockAlerts();
+            renderSheet();
+          }
+          else if (state.view === 'products') renderProducts(minDate, maxDate);
+          else if (state.view === 'daily') {
+            renderDaily(new Date(minDate), new Date(maxDate));
+            const sStart = document.getElementById('scoreboard-start-date').value;
+            const sEnd = document.getElementById('scoreboard-end-date').value;
+            if (sStart && sEnd) renderScoreboard(new Date(sStart), new Date(sEnd));
+          }
+          else if (state.view === 'weekly') renderWeekly(new Date(minDate), new Date(maxDate));
+          else if (state.view === 'monthly') renderMonthly(new Date(minDate), new Date(maxDate));
+          else if (state.view === 'all-time') renderAllTime(new Date(minDate), new Date(maxDate), 'all-time');
+          else if (state.view === 'analytics') renderAnalytics(minDate, maxDate);
+          
+          if (document.getElementById('intel-drawer').classList.contains('active')) {
+            updateIntelligence();
+          }
+        };
+
+        // Render immediately with local data
+        await renderUI();
+        if (!isForce) hideLoading();
+
+        // 3. Background Sync with Shopify (Non-blocking unless isForce)
+        const runSync = async () => {
+          try {
+            if (state.view === 'sheet' || state.view === 'products') {
+              await syncInventory();
+            }
+            await syncShopifyToSupabase(minDate, maxDate, isForce);
+            
+            // Re-fetch and silent re-render if we successfully completed sync
+            state.orders = await fetchOrdersFromSupabase(fetchMin, maxDate);
+            await loadAdCosts(dbMin, dbMax);
+            await renderUI();
+          } catch(e) {
+            log("Shopify sync failed: " + e.message);
+          }
+        };
+
+        if (isForce) {
+          showLoading('Syncing with Shopify...');
+          await runSync();
+          hideLoading();
+        } else {
+          // Fire and forget (silent background sync)
+          runSync();
         }
 
       } catch (error) {
         console.error("Error updating view:", error);
         alert("Failed to fetch data. Please check console for errors.");
-      } finally {
         hideLoading();
       }
     }
