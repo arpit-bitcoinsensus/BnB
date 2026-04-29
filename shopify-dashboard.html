@@ -476,6 +476,7 @@
             <h3 style="margin: 0; font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Cumulative Net Profit</h3>
             <div id="scoreboard-net-profit" style="font-size: 36px; font-weight: 700; margin-top: 8px;">₹0</div>
             <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="scoreboard-date-range">...</div>
+            <div id="scoreboard-stats" style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;"></div>
           </div>
           <div style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
             <button id="btn-toggle-cpp" style="display: none; background: rgba(167, 139, 250, 0.1); border: 1px solid #a78bfa; padding: 8px 16px; border-radius: 8px; color: #a78bfa; cursor: pointer; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; transition: all 0.2s ease;">
@@ -2737,6 +2738,13 @@
       let maxProfit = 0;
       let maxLoss = 0;
       
+      let totalAdCostRange = 0;
+      let totalItemsRange = 0;
+      let profitDaysCount = 0;
+      let profitDaysAmount = 0;
+      let lossDaysCount = 0;
+      let lossDaysAmount = 0;
+      
       // Iterate over each day from newest to oldest
       for (var d = new Date(dEnd); d >= dStart; d.setDate(d.getDate() - 1)) {
         const dateStr = toDateStr(d);
@@ -2779,6 +2787,17 @@
             if (o.line_items) o.line_items.forEach(li => totalItemsCount += parseInt(li.quantity || 1));
           });
           const cpp = totalItemsCount > 0 ? (adCost / totalItemsCount) : 0;
+          
+          totalAdCostRange += adCost;
+          totalItemsRange += totalItemsCount;
+          
+          if (pl.profit > 0) {
+            profitDaysCount++;
+            profitDaysAmount += pl.profit;
+          } else if (pl.profit < 0) {
+            lossDaysCount++;
+            lossDaysAmount += pl.profit;
+          }
           
           dayData.push({
             date: new Date(d),
@@ -2837,6 +2856,22 @@
       profitEl.style.textShadow = totalNet >= 0 ? '0 0 20px rgba(52, 211, 153, 0.4)' : '0 0 20px rgba(248, 113, 113, 0.4)';
 
       document.getElementById('scoreboard-date-range').textContent = `${new Date(dStart).toLocaleDateString()} to ${new Date(dEnd).toLocaleDateString()}`;
+      
+      const avgCpp = totalItemsRange > 0 ? (totalAdCostRange / totalItemsRange) : 0;
+      document.getElementById('scoreboard-stats').innerHTML = `
+        <div style="background: rgba(167, 139, 250, 0.1); border: 1px solid rgba(167, 139, 250, 0.3); padding: 8px 14px; border-radius: 8px;">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Avg CPP</div>
+          <div style="font-size: 15px; font-weight: 700; color: #a78bfa;">₹${fmt(avgCpp)}</div>
+        </div>
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 8px 14px; border-radius: 8px;">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Profitable Days (${profitDaysCount})</div>
+          <div style="font-size: 15px; font-weight: 700; color: var(--profit-color);">+${fmt(profitDaysAmount)}</div>
+        </div>
+        <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px 14px; border-radius: 8px;">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Loss Days (${lossDaysCount})</div>
+          <div style="font-size: 15px; font-weight: 700; color: var(--loss-color);">-${fmt(Math.abs(lossDaysAmount))}</div>
+        </div>
+      `;
       
       const breakdownList = document.getElementById('scoreboard-breakdown-list');
       if (breakdownHtml === '') {
