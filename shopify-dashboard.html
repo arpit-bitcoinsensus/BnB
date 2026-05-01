@@ -1837,7 +1837,6 @@
     // Fetch API
     async function syncInventory() {
       if (!sbClient) return;
-      showLoading('Syncing inventory levels...');
       try {
         const response = await fetch(`/shopify-api/admin/api/2024-01/products.json?limit=250`);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
