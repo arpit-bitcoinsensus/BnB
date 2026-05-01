@@ -2159,7 +2159,16 @@
 
         // 3. Background Sync with Shopify (Non-blocking unless isForce)
         const runSync = async () => {
+          const badge = document.getElementById('conn-badge');
           try {
+            if (!isForce && badge) {
+              badge.textContent = '🔄 Syncing Fresh Data...';
+              badge.className = 'badge warning';
+              badge.style.display = 'inline-block';
+              badge.style.background = 'rgba(245, 158, 11, 0.15)';
+              badge.style.color = '#f59e0b';
+              badge.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+            }
             if (state.view === 'sheet' || state.view === 'products') {
               await syncInventory();
             }
@@ -2169,8 +2178,25 @@
             state.orders = await fetchOrdersFromSupabase(fetchMin, maxDate);
             await loadAdCosts(dbMin, dbMax);
             await renderUI();
+
+            if (!isForce && badge) {
+              badge.textContent = '✅ Live Data';
+              badge.className = 'badge live';
+              badge.style.background = 'rgba(16, 185, 129, 0.15)';
+              badge.style.color = 'var(--profit-color)';
+              badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+              setTimeout(() => { badge.style.display = 'none'; }, 4000);
+            }
           } catch(e) {
             log("Shopify sync failed: " + e.message);
+            if (!isForce && badge) {
+              badge.textContent = '⚠️ Sync Failed';
+              badge.className = 'badge demo';
+              badge.style.background = 'rgba(239, 68, 68, 0.15)';
+              badge.style.color = 'var(--loss-color)';
+              badge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+              setTimeout(() => { badge.style.display = 'none'; }, 4000);
+            }
           }
         };
 
