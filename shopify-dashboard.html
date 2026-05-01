@@ -2593,41 +2593,43 @@
       `;
     }
 
-    async function renderProducts(minDate, maxDate) {
+    function renderProducts(minDate, maxDate) {
       const tbody = document.getElementById('products-tbody');
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px;">Analyzing product performance...</td></tr>';
-      
-      if (!sbClient) return;
-      
-      // Fetch items sold in range
-      const { data, error } = await sbClient
-        .from('order_items')
-        .select('title, quantity, price')
-        .gte('created_at', minDate)
-        .lte('created_at', maxDate);
 
-      if (error) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-loss)">Error: ${error.message}</td></tr>`;
-        return;
-      }
+      // Use state.orders (already date-filtered) with their embedded line_items
+      // order_items table does NOT store created_at, so we cannot filter by date directly on it
+      const orders = state.orders || [];
 
       const stats = {};
-      data.forEach(item => {
-        if (!stats[item.title]) stats[item.title] = { sold: 0, revenue: 0 };
-        stats[item.title].sold += (item.quantity || 0);
-        stats[item.title].revenue += ((item.quantity || 0) * (item.price || 0));
+      const skuMap = {};
+
+      orders.forEach(order => {
+        const items = order.line_items || [];
+        items.forEach(item => {
+          const title = item.title || 'Unknown';
+          if (!stats[title]) stats[title] = { sold: 0, revenue: 0 };
+          stats[title].sold += (item.quantity || 0);
+          stats[title].revenue += ((item.quantity || 0) * parseFloat(item.price || 0));
+          if (item.sku && !skuMap[title]) skuMap[title] = item.sku;
+        });
       });
 
       const sorted = Object.entries(stats).sort((a, b) => b[1].revenue - a[1].revenue);
 
+      if (sorted.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted)">No product data found for this range. Try clicking "Analyze Products" after selecting a date range.</td></tr>';
+        return;
+      }
+
       tbody.innerHTML = sorted.map(([title, s]) => {
-        const sku = data.find(item => item.title === title)?.sku;
+        const sku = skuMap[title] || '';
         const pricing = state.productPricing[sku] || { cp: PRODUCT_COST, shipping: SHIPPING_COST };
         const cost = s.sold * (pricing.cp + pricing.shipping);
         const profit = s.revenue - cost;
         return `
           <tr>
-            <td>${title} <div style="font-size:10px; color:var(--text-muted)">${sku || ''}</div></td>
+            <td>${title} <div style="font-size:10px; color:var(--text-muted)">${sku}</div></td>
             <td style="font-weight:600;">${s.sold}</td>
             <td>${fmt(s.revenue)}</td>
             <td class="text-loss">${fmt(cost)}</td>
@@ -2635,10 +2637,6 @@
           </tr>
         `;
       }).join('');
-
-      if (sorted.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted)">No product data found for this range.</td></tr>';
-      }
     }
 
     function exportToCSV() {
