@@ -870,6 +870,26 @@
       return `${year}-${month}-${day}`;
     }
 
+    // Returns the IST date string (YYYY-MM-DD) for an order's created_at timestamp.
+    // This is the ONLY correct way to group orders by day in this IST-based dashboard.
+    // created_at is stored as a UTC ISO string; IST = UTC + 5:30.
+    function getOrderDateIST(o) {
+      if (!o.created_at) return '';
+      const utcMs = new Date(o.created_at).getTime();
+      const istMs = utcMs + (5.5 * 60 * 60 * 1000);
+      const istDate = new Date(istMs);
+      const year = istDate.getUTCFullYear();
+      const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(istDate.getUTCDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // Parse a YYYY-MM-DD string as a plain local Date at noon (avoids DST/timezone boundary issues).
+    function parseDateStr(s) {
+      const [y, m, d] = s.split('-').map(Number);
+      return new Date(y, m - 1, d, 12, 0, 0);
+    }
+
     // AUTHENTICATION
     function checkAuth() {
       const auth = localStorage.getItem('bnb_auth');
@@ -1535,9 +1555,9 @@
             const { data } = await sbClient.from('ad_costs').select('date, amount').gte('date', sStart).lte('date', sEnd);
             if (data) data.forEach(r => sbAdCosts[r.date] = r.amount);
             
-            renderScoreboard(new Date(sStart), new Date(sEnd), sbOrders, sbAdCosts);
+            renderScoreboard(parseDateStr(sStart), parseDateStr(sEnd), sbOrders, sbAdCosts);
           } else {
-            renderScoreboard(new Date(sStart), new Date(sEnd));
+            renderScoreboard(parseDateStr(sStart), parseDateStr(sEnd));
           }
         } catch (e) {
           console.error(e);
@@ -2137,14 +2157,14 @@
           }
           else if (state.view === 'products') renderProducts(minDate, maxDate);
           else if (state.view === 'daily') {
-            renderDaily(new Date(minDate), new Date(maxDate));
+            renderDaily(dbMin, dbMax);
             const sStart = document.getElementById('scoreboard-start-date').value;
             const sEnd = document.getElementById('scoreboard-end-date').value;
-            if (sStart && sEnd) renderScoreboard(new Date(sStart), new Date(sEnd));
+            if (sStart && sEnd) renderScoreboard(parseDateStr(sStart), parseDateStr(sEnd));
           }
-          else if (state.view === 'weekly') renderWeekly(new Date(minDate), new Date(maxDate));
-          else if (state.view === 'monthly') renderMonthly(new Date(minDate), new Date(maxDate));
-          else if (state.view === 'all-time') renderAllTime(new Date(minDate), new Date(maxDate), 'all-time');
+          else if (state.view === 'weekly') renderWeekly(parseDateStr(dbMin), parseDateStr(dbMax));
+          else if (state.view === 'monthly') renderMonthly(parseDateStr(dbMin), parseDateStr(dbMax));
+          else if (state.view === 'all-time') renderAllTime(parseDateStr(dbMin), parseDateStr(dbMax), 'all-time');
           else if (state.view === 'analytics') renderAnalytics(minDate, maxDate);
           
           if (document.getElementById('intel-drawer').classList.contains('active')) {
@@ -2773,11 +2793,7 @@
       // Iterate over each day from newest to oldest
       for (var d = new Date(dEnd); d >= dStart; d.setDate(d.getDate() - 1)) {
         const dateStr = toDateStr(d);
-        const dayOrders = orders.filter(o => {
-          const oDate = new Date(o.created_at);
-          const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
-          return oIST.toISOString().startsWith(dateStr);
-        });
+        const dayOrders = orders.filter(o => getOrderDateIST(o) === dateStr);
         
         const tagsCounts = categorizeOrders(dayOrders);
         const revenue = getTotalRevenue(dayOrders);
@@ -2907,22 +2923,21 @@
     }
 
     // RENDERING: DAILY
-    function renderDaily(dStart, dEnd) {
+    // dStartStr and dEndStr are plain YYYY-MM-DD strings (IST dates).
+    function renderDaily(dStartStr, dEndStr) {
       document.getElementById('daily-last-updated').textContent = `Loaded at ${new Date().toLocaleTimeString()}`;
       
       const feedContainer = document.getElementById('daily-feed');
       feedContainer.innerHTML = ''; // clear
 
-      // To iterate newest to oldest
+      // Build a list of date strings from end to start (newest first)
       const dayBlocks = [];
+      const dStart = parseDateStr(dStartStr);
+      const dEnd   = parseDateStr(dEndStr);
 
       for (var d = new Date(dEnd); d >= dStart; d.setDate(d.getDate() - 1)) {
         const dateStr = toDateStr(d);
-        const dayOrders = state.orders.filter(o => {
-          const oDate = new Date(o.created_at);
-          const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
-          return oIST.toISOString().startsWith(dateStr);
-        });
+        const dayOrders = state.orders.filter(o => getOrderDateIST(o) === dateStr);
         const tagsCounts = categorizeOrders(dayOrders);
         const revenue = getTotalRevenue(dayOrders);
         const deliveredCount = tagsCounts['Delivered'] || 0;
@@ -2962,7 +2977,8 @@
         pl.prepaidRevenue = revBreakdown.prepaidRevenue;
         pl.prepaidCount = revBreakdown.prepaidCount;
 
-        const prettyDate = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        // Build a display Date from the dateStr (noon local) for formatting
+        const prettyDate = parseDateStr(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
         const profitClass = pl.profit >= 0 ? 'text-profit' : 'text-loss';
         const profitChar = pl.profit >= 0 ? '▲' : '▼';
@@ -3090,8 +3106,8 @@
             <div class="metric-card clickable glow-purple" onclick="handleCardFilter('${dateStr}','out-delivery',this)"><div class="metric-label">Out for Delivery</div><div class="metric-value" style="color:#a78bfa">${tagsCounts['Out for Delivery'] || 0}</div></div>
             <div class="metric-card clickable glow-orange" onclick="handleCardFilter('${dateStr}','failed-delivery',this)"><div class="metric-label">Failed Delivery</div><div class="metric-value" style="color:#f97316">${tagsCounts['Failed Delivery'] || 0}</div></div>
             <div class="metric-card clickable glow-red"    onclick="handleCardFilter('${dateStr}','canceled',this)"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${tagsCounts['Canceled'] || 0}</div></div>
-            ${(d >= new Date('2026-03-28T00:00:00')) ? `<div class="metric-card clickable glow-yellow" onclick="handleCardFilter('${dateStr}','rto-prediction',this)"><div class="metric-label">Possibility of RTO</div><div class="metric-value text-warning">${tagsCounts['RTO Prediction'] || 0}</div></div>` : ''}
-            ${(d >= new Date('2026-02-25T00:00:00')) ? `<div class="metric-card clickable glow-red"    onclick="handleCardFilter('${dateStr}','rto',this)"><div class="metric-label">RTO / Undelivered</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>` : ''}
+            ${(dateStr >= '2026-03-28') ? `<div class="metric-card clickable glow-yellow" onclick="handleCardFilter('${dateStr}','rto-prediction',this)"><div class="metric-label">Possibility of RTO</div><div class="metric-value text-warning">${tagsCounts['RTO Prediction'] || 0}</div></div>` : ''}
+            ${(dateStr >= '2026-02-25') ? `<div class="metric-card clickable glow-red"    onclick="handleCardFilter('${dateStr}','rto',this)"><div class="metric-label">RTO / Undelivered</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>` : ''}
             <div class="metric-card clickable glow-yellow" onclick="handleCardFilter('${dateStr}','unreachable',this)"><div class="metric-label">Unreachable</div><div class="metric-value" style="color:#facc15">${tagsCounts['Unreachable'] || 0}</div></div>
             <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(revBreakdown))}')"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
             <div class="metric-card">
@@ -3101,8 +3117,8 @@
                 <button class="inline-btn primary" id="btn-ad-${dateStr}">Save</button>
               </div>
             </div>
-            ${(d >= new Date(PREPAID_LAUNCH_DATE + 'T00:00:00')) ? `<div class="metric-card clickable glow-indigo" onclick="handleCardFilter('${dateStr}','prepaid',this)"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${paymentCounts.prepaid}</div></div>` : ''}
-            ${(d >= new Date(PREPAID_LAUNCH_DATE + 'T00:00:00')) ? `<div class="metric-card clickable glow-amber"  onclick="handleCardFilter('${dateStr}','cash',this)"><div class="metric-label">Cash Orders</div><div class="metric-value" style="color:#fb923c">${paymentCounts.cash}</div></div>` : ''}
+            ${(dateStr >= PREPAID_LAUNCH_DATE) ? `<div class="metric-card clickable glow-indigo" onclick="handleCardFilter('${dateStr}','prepaid',this)"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${paymentCounts.prepaid}</div></div>` : ''}
+            ${(dateStr >= PREPAID_LAUNCH_DATE) ? `<div class="metric-card clickable glow-amber"  onclick="handleCardFilter('${dateStr}','cash',this)"><div class="metric-label">Cash Orders</div><div class="metric-value" style="color:#fb923c">${paymentCounts.cash}</div></div>` : ''}
             <div class="metric-card clickable glow-white" onclick="showPLBreakdown('${encodeURIComponent(JSON.stringify(pl))}')"><div class="metric-label">Net Profit</div><div class="metric-value ${pl.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(pl.profit)}</div></div>
           </div>
 
@@ -3151,7 +3167,7 @@
                // Soft re-render to update UI immediately
                const dStartStr = document.getElementById('daily-start-date').value;
                const dEndStr = document.getElementById('daily-end-date').value;
-               renderDaily(new Date(dStartStr), new Date(dEndStr));
+               renderDaily(dStartStr, dEndStr);
             });
           });
         }
@@ -3176,11 +3192,7 @@
 
       for (var d = new Date(wStart); d <= wEnd; d.setDate(d.getDate() + 1)) {
         const dStr = toDateStr(d);
-        const dOrders = state.orders.filter(o => {
-          const oDate = new Date(o.created_at);
-          const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
-          return oIST.toISOString().startsWith(dStr);
-        });
+        const dOrders = state.orders.filter(o => getOrderDateIST(o) === dStr);
         const tCounts = categorizeOrders(dOrders);
         const dRev = getTotalRevenue(dOrders);
         const dDel = tCounts['Delivered'] || 0;
@@ -3226,7 +3238,12 @@
       const totalShopifySales = daysData.reduce((sum, d) => sum + d.totalSales, 0);
       const wPL = calcPL(totalRevenue, totalDelivered, totalAdCost, totalFulfilled, allViewItems, totalShopifySales);
       const wRet = getRetentionMetrics();
-      const allWeekOrders = state.orders.filter(o => { const oDate = new Date(o.created_at); const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000)); const s = oIST.toISOString(); return s >= wStart.toISOString() && s <= wEnd.toISOString(); });
+      const wStartStr = toDateStr(wStart);
+      const wEndStr = toDateStr(wEnd);
+      const allWeekOrders = state.orders.filter(o => {
+        const d = getOrderDateIST(o);
+        return d >= wStartStr && d <= wEndStr;
+      });
       const wRevBreakdown = getRevenueBreakdown(allWeekOrders);
       wPL.deliveredRevenue = wRevBreakdown.deliveredRevenue;
       wPL.prepaidRevenue = wRevBreakdown.prepaidRevenue;
@@ -3300,11 +3317,7 @@
 
       for (var d = new Date(mStart); d <= mEnd; d.setDate(d.getDate() + 1)) {
         const dStr = toDateStr(d);
-        const dOrders = state.orders.filter(o => {
-          const oDate = new Date(o.created_at);
-          const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
-          return oIST.toISOString().startsWith(dStr);
-        });
+        const dOrders = state.orders.filter(o => getOrderDateIST(o) === dStr);
         const tCounts = categorizeOrders(dOrders);
         const dRev = getTotalRevenue(dOrders);
         const dDel = tCounts['Delivered'] || 0;
@@ -3340,7 +3353,10 @@
       const revenueDeliveredCount = totalDelivered + totalPrepaid;
       const mPL = calcPL(totalRevenue, revenueDeliveredCount, totalAdCost, totalFulfilled, allItems, totalShopifySales, totalDelivered);
       const mRet = getRetentionMetrics();
-      const mRevBreakdown = getRevenueBreakdown(state.orders.filter(o => { const oDate = new Date(o.created_at); const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000)); return oIST >= mStart && oIST <= mEnd; }));
+      const mRevBreakdown = getRevenueBreakdown(state.orders.filter(o => {
+        const d = getOrderDateIST(o);
+        return d >= toDateStr(mStart) && d <= toDateStr(mEnd);
+      }));
       mPL.deliveredRevenue = mRevBreakdown.deliveredRevenue;
       mPL.prepaidRevenue = mRevBreakdown.prepaidRevenue;
       mPL.prepaidCount = mRevBreakdown.prepaidCount;
@@ -3388,21 +3404,12 @@
             { label: 'Total Orders', data: Array.from({length: mEnd.getDate()}, (_, i) => {
                 const day = i + 1;
                 const dStr = toDateStr(new Date(mStart.getFullYear(), mStart.getMonth(), day));
-                const dOrders = state.orders.filter(o => {
-                  const oDate = new Date(o.created_at);
-                  const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
-                  return oIST.toISOString().startsWith(dStr);
-                });
-                return dOrders.length;
+                return state.orders.filter(o => getOrderDateIST(o) === dStr).length;
               }), backgroundColor: '#fbbf24' },
             { label: 'Delivered', data: Array.from({length: mEnd.getDate()}, (_, i) => {
                 const day = i + 1;
                 const dStr = toDateStr(new Date(mStart.getFullYear(), mStart.getMonth(), day));
-                const dOrders = state.orders.filter(o => {
-                  const oDate = new Date(o.created_at);
-                  const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
-                  return oIST.toISOString().startsWith(dStr);
-                });
+                const dOrders = state.orders.filter(o => getOrderDateIST(o) === dStr);
                 const tCounts = categorizeOrders(dOrders);
                 return tCounts['Delivered'] || 0;
               }), backgroundColor: '#34d399' }
@@ -3548,11 +3555,7 @@
           const dStr = toDateStr(d);
           labels.push(d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'}));
           
-          const dOrders = currOrders.filter(o => {
-            const od = parseDate(o.created_at);
-            const odIST = new Date(od.getTime() + (5.5 * 60 * 60 * 1000));
-            return toDateStr(odIST) === dStr;
-          });
+          const dOrders = currOrders.filter(o => getOrderDateIST(o) === dStr);
           currData[i] = {
             y: dOrders.length,
             rev: dOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0),
@@ -3561,11 +3564,7 @@
 
           const pD = new Date(prevTMin.getTime() + i * 24 * 60 * 60 * 1000);
           const pDStr = toDateStr(pD);
-          const pOrders = prevOrders.filter(o => {
-            const od = parseDate(o.created_at);
-            const odIST = new Date(od.getTime() + (5.5 * 60 * 60 * 1000));
-            return toDateStr(odIST) === pDStr;
-          });
+          const pOrders = prevOrders.filter(o => getOrderDateIST(o) === pDStr);
           prevData[i] = {
             y: pOrders.length,
             rev: pOrders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0),
@@ -3675,9 +3674,9 @@
       // Group by YY-MM for breakdown
       const monthGroups = {};
       currentOrders.forEach(o => {
-        const oDate = new Date(o.created_at);
-        const oIST = new Date(oDate.getTime() + (5.5 * 60 * 60 * 1000));
-        const yymm = `${oIST.getFullYear()}-${String(oIST.getMonth()+1).padStart(2,'0')}`;
+        // Use getOrderDateIST for consistent IST date, then extract YYYY-MM
+        const istDate = getOrderDateIST(o);
+        const yymm = istDate.substring(0, 7); // YYYY-MM
         if(!monthGroups[yymm]) monthGroups[yymm] = [];
         monthGroups[yymm].push(o);
       });
