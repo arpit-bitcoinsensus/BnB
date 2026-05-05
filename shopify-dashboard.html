@@ -2616,13 +2616,25 @@
 
     async function syncPricingFromInventory() {
       if (!sbClient) return;
-      showLoading('Syncing SKUs from Inventory table...');
+      showLoading('Syncing SKUs from Inventory and Shopify...');
       try {
-        // 1. Fetch from inventory table
+        // 1. Fetch live product status from Shopify API
+        let shopifyProducts = [];
+        try {
+          const response = await fetch(`/shopify-api/admin/api/2024-01/products.json?limit=250`);
+          if (response.ok) {
+            const data = await response.json();
+            shopifyProducts = data.products || [];
+          }
+        } catch (err) {
+          console.warn("Could not fetch Shopify products for status sync:", err);
+        }
+
+        // 2. Fetch from inventory table
         const { data: invData, error: invError } = await sbClient.from('inventory').select('sku, title');
         if (invError) throw invError;
 
-        // 2. Fetch unique SKUs from order_items table for products that might not be in inventory
+        // 3. Fetch unique SKUs from order_items table for products that might not be in inventory
         const { data: orderItemsData, error: oiError } = await sbClient.from('order_items').select('sku, title');
         if (oiError) throw oiError;
 
@@ -2647,6 +2659,27 @@
             }
           }
         });
+
+        // 4. Update hidden status based on Shopify "active" status
+        if (shopifyProducts.length > 0) {
+          shopifyProducts.forEach(p => {
+            p.variants.forEach(v => {
+              const sku = v.sku || ('TITLE:' + p.title);
+              if (p.status === 'active') {
+                window.hiddenPricingSKUs.delete(sku);
+              } else {
+                window.hiddenPricingSKUs.add(sku);
+              }
+            });
+            const titleSku = 'TITLE:' + p.title;
+            if (p.status === 'active') {
+               window.hiddenPricingSKUs.delete(titleSku);
+            } else {
+               window.hiddenPricingSKUs.add(titleSku);
+            }
+          });
+          localStorage.setItem('hiddenPricingSKUs', JSON.stringify([...window.hiddenPricingSKUs]));
+        }
 
         renderPricing();
         log(`Synced ${Object.keys(state.productPricing).length} total SKUs from inventory and orders.`);
