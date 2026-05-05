@@ -1690,7 +1690,7 @@
                            fin === 'voided' || fin === 'refunded' || !!o.cancelled_at;
 
         // Not Confirmed (COD order, not canceled, missing 'confirm' tag)
-        const isCOD = fin === 'payment pending';
+        const isCOD = fin === 'pending';
         const hasConfirmTag = rawTags.some(t => t === 'confirm' || t === 'confirmed');
         const isNotConfirmed = isCOD && !hasConfirmTag && !isCanceled && !isFulfilled;
 
