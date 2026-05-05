@@ -454,15 +454,11 @@
           <table class="sheet-table">
             <thead>
               <tr>
-                <th>Product Name</th>
-                <th style="width: 120px;">Cost Price (₹)</th>
-                <th style="width: 120px;">Selling Price (₹)</th>
-                <th style="width: 120px;">Gross Profit (₹)</th>
-                <th style="width: 100px;">Margin %</th>
-                <th style="width: 150px;">Suggested Ad Spend (₹)</th>
-                <th style="width: 130px;">Break-even ROAS</th>
-                <th style="width: 150px;">Category</th>
-                <th style="width: 80px;" class="hide-mobile">Action</th>
+                <th>Product / SKU</th>
+                <th style="width: 150px;">Cost Price (CP)</th>
+                <th style="width: 150px;">Selling Price (SP)</th>
+                <th style="width: 180px;">Shipping/Fulfillment</th>
+                <th style="width: 100px;">Action</th>
               </tr>
             </thead>
             <tbody id="pricing-tbody">
@@ -2490,16 +2486,12 @@
         if (error) throw error;
         
         state.productPricing = {};
-        const localPricingMeta = JSON.parse(localStorage.getItem('pricingMeta') || '{}');
         data.forEach(p => {
-          const meta = localPricingMeta[p.sku] || {};
           state.productPricing[p.sku] = {
             cp: p.cost_price,
             sp: p.selling_price,
             shipping: p.shipping_charge,
-            title: p.product_title,
-            ad_spend: meta.ad_spend || '',
-            category: meta.category || ''
+            title: p.product_title
           };
         });
         renderPricing();
@@ -2547,43 +2539,21 @@
         const isHidden = window.hiddenPricingSKUs.has(sku);
         const rowOpacity = isHidden ? '0.4' : '1';
         
-        const cp = parseFloat(p.cp) || 0;
-        const sp = parseFloat(p.sp) || 0;
-        const grossProfit = sp - cp;
-        const marginPct = sp > 0 ? Math.round((grossProfit / sp) * 100) : 0;
-        const beRoas = grossProfit > 0 ? (sp / grossProfit).toFixed(1) : '-';
-        
         const row = document.createElement('tr');
         row.style.opacity = rowOpacity;
         row.innerHTML = `
-          <td data-label="Product Name">
-            <div style="font-weight:600; color:white; margin-bottom: 4px;">${p.title || 'Unknown Product'}</div>
+          <td data-label="Product">
+            <div style="font-weight:600; color:white;">${p.title || 'Unknown Product'}</div>
             <div style="font-size:11px; color:var(--text-muted);">${sku.startsWith('TITLE:') ? '(No SKU)' : sku}</div>
           </td>
-          <td data-label="Cost Price (₹)"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="cp" value="${p.cp}" style="width:80px;" ${isHidden ? 'disabled' : ''}></td>
-          <td data-label="Selling Price (₹)"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="sp" value="${p.sp}" style="width:80px;" ${isHidden ? 'disabled' : ''}></td>
-          <td data-label="Gross Profit (₹)">
-            <div style="font-weight: 500; color: ${grossProfit > 0 ? 'var(--profit-color)' : 'var(--text-main)'};">₹${grossProfit}</div>
-          </td>
-          <td data-label="Margin %">
-            <div>${marginPct}%</div>
-          </td>
-          <td data-label="Suggested Ad Spend (₹)">
-            <input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="ad_spend" value="${p.ad_spend}" placeholder="Auto" style="width:90px;" ${isHidden ? 'disabled' : ''}>
-          </td>
-          <td data-label="Break-even ROAS">
-            <div style="font-weight: 600;">${beRoas}</div>
-          </td>
-          <td data-label="Category">
-             <input type="text" class="inline-input pricing-input" data-sku="${sku}" data-field="category" value="${p.category || ''}" placeholder="Category" style="width:110px; text-align: left;" ${isHidden ? 'disabled' : ''}>
-          </td>
+          <td data-label="Cost Price (CP)"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="cp" value="${p.cp}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
+          <td data-label="Selling Price (SP)"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="sp" value="${p.sp}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
+          <td data-label="Shipping/Fulfillment"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="shipping" value="${p.shipping}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
           <td data-label="Action">
             <div style="display: flex; gap: 6px;">
-              <button class="expand-btn" onclick="saveSinglePricing('${sku}')" ${isHidden ? 'disabled' : ''} title="Save" style="padding: 6px 8px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-              </button>
-              <button class="expand-btn" onclick="toggleHidePricing('${sku}')" style="color:var(--text-muted); padding: 6px 8px;" title="${isHidden ? 'Unhide' : 'Hide'}">
-                ${isHidden ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>'}
+              <button class="expand-btn" onclick="saveSinglePricing('${sku}')" ${isHidden ? 'disabled' : ''}>Save</button>
+              <button class="expand-btn" onclick="toggleHidePricing('${sku}')" style="color:var(--text-muted);" title="Toggle visibility">
+                ${isHidden ? 'Unhide' : 'Hide'}
               </button>
             </div>
           </td>
@@ -2591,40 +2561,12 @@
         tbody.appendChild(row);
       });
 
-      // Add event listeners to inputs to update state dynamically and persist meta
+      // Add event listeners to inputs to update state
       document.querySelectorAll('.pricing-input').forEach(input => {
-        input.addEventListener('input', (e) => {
+        input.addEventListener('change', (e) => {
           const sku = e.target.dataset.sku;
           const field = e.target.dataset.field;
-          const val = e.target.value;
-          
-          if (field === 'ad_spend' || field === 'category') {
-             state.productPricing[sku][field] = val;
-             const meta = JSON.parse(localStorage.getItem('pricingMeta') || '{}');
-             if (!meta[sku]) meta[sku] = {};
-             meta[sku][field] = val;
-             localStorage.setItem('pricingMeta', JSON.stringify(meta));
-          } else {
-             state.productPricing[sku][field] = parseFloat(val) || 0;
-             // Update the specific row's text dynamically
-             const row = e.target.closest('tr');
-             const cp = parseFloat(state.productPricing[sku].cp) || 0;
-             const sp = parseFloat(state.productPricing[sku].sp) || 0;
-             const grossProfit = sp - cp;
-             const marginPct = sp > 0 ? Math.round((grossProfit / sp) * 100) : 0;
-             const beRoas = grossProfit > 0 ? (sp / grossProfit).toFixed(1) : '-';
-             
-             const gpCell = row.querySelector('td[data-label="Gross Profit (₹)"] div');
-             if (gpCell) {
-                 gpCell.textContent = '₹' + grossProfit;
-                 gpCell.style.color = grossProfit > 0 ? 'var(--profit-color)' : 'var(--text-main)';
-             }
-             const marginCell = row.querySelector('td[data-label="Margin %"] div');
-             if (marginCell) marginCell.textContent = marginPct + '%';
-             
-             const roasCell = row.querySelector('td[data-label="Break-even ROAS"] div');
-             if (roasCell) roasCell.textContent = beRoas;
-          }
+          state.productPricing[sku][field] = parseFloat(e.target.value) || 0;
         });
       });
     }
@@ -2693,14 +2635,11 @@
           if (!lookupKey) return;
           
           if (!state.productPricing[lookupKey]) {
-            const meta = JSON.parse(localStorage.getItem('pricingMeta') || '{}')[lookupKey] || {};
             state.productPricing[lookupKey] = {
               cp: 555,
               sp: 0,
               shipping: 135,
-              title: tTitle,
-              ad_spend: meta.ad_spend || '',
-              category: meta.category || ''
+              title: tTitle
             };
           } else {
             if (!state.productPricing[lookupKey].title || state.productPricing[lookupKey].title === 'Unknown Product') {
