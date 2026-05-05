@@ -803,7 +803,7 @@
     const STORE_LAUNCH_DATE = '2026-02-01'; // User can adjust this if needed
     const PREPAID_LAUNCH_DATE = '2026-03-28'; // Date from which prepaid orders started
 
-    const STATUS_TAGS = ['Delivered','Canceled','Attempted Delivery','In Transit','Out for Delivery','Failed Delivery','Paid','Payment Pending','Unfulfilled','Fulfilled','RTO','Unreachable','RTO Prediction'];
+    const STATUS_TAGS = ['Delivered','Canceled','Attempted Delivery','In Transit','Out for Delivery','Failed Delivery','Paid','Payment Pending','Unfulfilled','Fulfilled','RTO','Unreachable','RTO Prediction', 'Not Confirmed'];
     const CHART_COLORS = {
       'Delivered': '#34d399',
       'Canceled': '#f87171',
@@ -1288,6 +1288,7 @@
         if (filterKey === 'rto-prediction')  return tCounts['RTO Prediction'] > 0;
         if (filterKey === 'rto')             return tCounts['RTO'] > 0;
         if (filterKey === 'unreachable')     return tCounts['Unreachable'] > 0;
+        if (filterKey === 'not-confirmed')   return tCounts['Not Confirmed'] > 0;
         if (filterKey === 'prepaid')         return isOrderPrepaidRevenue(o);
         if (filterKey === 'cash')            return !isOrderPrepaidRevenue(o);
         return true;
@@ -1688,8 +1689,13 @@
         const isCanceled = rawTags.some(t => t === 'canceled' || t === 'cancelled') ||
                            fin === 'voided' || fin === 'refunded' || !!o.cancelled_at;
 
+        // Not Confirmed (COD order, not canceled, missing 'confirm' tag)
+        const isCOD = fin === 'payment pending';
+        const hasConfirmTag = rawTags.some(t => t === 'confirm' || t === 'confirmed');
+        const isNotConfirmed = isCOD && !hasConfirmTag && !isCanceled && !isFulfilled;
+
         // Unfulfilled fallback
-        const isUnfulfilled = !isFulfilled && !isCanceled &&
+        const isUnfulfilled = !isFulfilled && !isCanceled && !isNotConfirmed &&
                               (fs === '' || fs === 'unfulfilled' || !fs);
 
         // Apply counts
@@ -1703,9 +1709,10 @@
         if (isFailedDelivery)  counts['Failed Delivery']++;
         if (isCanceled)        counts['Canceled']++;
         if (isUnfulfilled)     counts['Unfulfilled']++;
+        if (isNotConfirmed)    counts['Not Confirmed']++;
 
         const anyMatched = isFulfilled || isDelivered || isRTO || isUnreachable || isInTransit ||
-                           isOutForDelivery || isFailedDelivery || isCanceled || isUnfulfilled;
+                           isOutForDelivery || isFailedDelivery || isCanceled || isUnfulfilled || isNotConfirmed;
         if (!anyMatched) counts['Other']++;
       });
       return counts;
@@ -3177,6 +3184,7 @@
             ${(dateStr >= '2026-03-28') ? `<div class="metric-card clickable glow-yellow" onclick="handleCardFilter('${dateStr}','rto-prediction',this)"><div class="metric-label">Possibility of RTO</div><div class="metric-value text-warning">${tagsCounts['RTO Prediction'] || 0}</div></div>` : ''}
             ${(dateStr >= '2026-02-25') ? `<div class="metric-card clickable glow-red"    onclick="handleCardFilter('${dateStr}','rto',this)"><div class="metric-label">RTO / Undelivered</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>` : ''}
             <div class="metric-card clickable glow-yellow" onclick="handleCardFilter('${dateStr}','unreachable',this)"><div class="metric-label">Unreachable</div><div class="metric-value" style="color:#facc15">${tagsCounts['Unreachable'] || 0}</div></div>
+            <div class="metric-card clickable glow-red" onclick="handleCardFilter('${dateStr}','not-confirmed',this)"><div class="metric-label" style="font-size:11px;">Order Not Confirmed</div><div class="metric-value text-loss">${tagsCounts['Not Confirmed'] || 0}</div></div>
             <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(revBreakdown))}')"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
             <div class="metric-card">
               <div class="metric-label">Ad Spend</div>
@@ -3431,6 +3439,11 @@
 
       let monthlyTotalItems = 0;
       allItems.forEach(li => monthlyTotalItems += parseInt(li.quantity || 1));
+      let totalNotConfirmed = 0;
+      currentOrders.forEach(o => {
+        const t = categorizeOrders([o]);
+        totalNotConfirmed += t['Not Confirmed'] || 0;
+      });
 
       document.getElementById('monthly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
@@ -3440,6 +3453,7 @@
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${mRet.repeatRate}%</div></div>
         <div class="metric-card"><div class="metric-label">In Transit</div><div class="metric-value" style="color:var(--primary)">${totalTransit}</div></div>
         <div class="metric-card"><div class="metric-label">Canceled</div><div class="metric-value text-loss">${totalCanceled}</div></div>
+        <div class="metric-card"><div class="metric-label" style="font-size:11px;">Order Not Confirmed</div><div class="metric-value text-loss">${totalNotConfirmed || 0}</div></div>
         ${(mEnd >= new Date('2026-03-28T00:00:00')) ? `<div class="metric-card"><div class="metric-label">Possibility of RTO</div><div class="metric-value text-warning">${totalRTOPrediction}</div></div>` : ''}
         ${(mEnd >= new Date('2026-02-25T00:00:00')) ? `<div class="metric-card"><div class="metric-label">RTO / Undelivered</div><div class="metric-value text-loss">${totalRTO}</div></div>` : ''}
         <div class="metric-card"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${totalPrepaid}</div></div>
@@ -3548,6 +3562,7 @@
       let totalFulfilled = tCounts['Fulfilled'] || 0;
       let totalCanceled = tCounts['Canceled'] || 0;
       let totalTransit = tCounts['In Transit'] || 0;
+      let totalNotConfirmed = tCounts['Not Confirmed'] || 0;
       
       let totalAdCost = Object.values(state.adCosts).reduce((sum, cost) => sum + cost, 0);
       
@@ -3580,6 +3595,7 @@
         <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${atRet.repeatRate}%</div></div>
+        <div class="metric-card"><div class="metric-label" style="font-size:11px;">Order Not Confirmed</div><div class="metric-value text-loss">${totalNotConfirmed}</div></div>
         <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(atRevBreakdown))}')"><div class="metric-label">${titleOverride} Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
         <div class="metric-card">
           <div class="metric-label">${titleOverride} Ad Spend</div>
