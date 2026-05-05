@@ -2826,7 +2826,10 @@
           const isDel = categorizeOrders([o])['Delivered'] > 0;
           const isPrepaidRev = isOrderPrepaidRevenue(o);
           const isCountedForCost = isDel || isPrepaidRev;
-          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel || isPrepaidRev);
+          // Only charge shipping/logistics cost when the order generates revenue.
+          // RTO/Canceled fulfilled orders should NOT incur shipping cost — they produce
+          // zero revenue, so attributing cost to them creates false negatives.
+          const isFul = isCountedForCost;
           if (o.line_items) {
             o.line_items.forEach(li => {
               const lookupKey = li.sku || ('TITLE:' + li.title);
@@ -2972,7 +2975,7 @@
           const isDel = categorizeOrders([o])['Delivered'] > 0;
           const isPrepaidRev = isOrderPrepaidRevenue(o);
           const isCountedForCost = isDel || isPrepaidRev; // prepaid orders incur product cost too
-          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel || isPrepaidRev);
+          const isFul = isCountedForCost; // only charge shipping when revenue is generated
           if (o.line_items) {
             o.line_items.forEach(li => {
               const lookupKey = li.sku || ('TITLE:' + li.title);
@@ -3225,7 +3228,7 @@
           const isDel = categorizeOrders([o])['Delivered'] > 0;
           const isPrepaidRev = isOrderPrepaidRevenue(o);
           const isCountedForCost = isDel || isPrepaidRev;
-          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel || isPrepaidRev);
+          const isFul = isCountedForCost; // only charge shipping when revenue is generated
           if (o.line_items) o.line_items.forEach(li => {
             const lookupKey = li.sku || ('TITLE:' + li.title);
             dItems.push({...li, sku: lookupKey, isDelivered: isCountedForCost, isFulfilled: isFul});
@@ -3348,7 +3351,7 @@
           const isDel = categorizeOrders([o])['Delivered'] > 0;
           const isPrepaidRev = isOrderPrepaidRevenue(o);
           const isCountedForCost = isDel || isPrepaidRev;
-          const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel || isPrepaidRev);
+          const isFul = isCountedForCost; // only charge shipping when revenue is generated
           if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isCountedForCost, isFulfilled: isFul}));
         });
         const dPrepaidCnt = dOrders.filter(isOrderPrepaidRevenue).length;
@@ -3508,7 +3511,7 @@
         const isDel = categorizeOrders([o])['Delivered'] > 0;
         const isPrepaidRev = isOrderPrepaidRevenue(o);
         const isCountedForCost = isDel || isPrepaidRev;
-        const isFul = (categorizeOrders([o])['Fulfilled'] > 0 || isDel || isPrepaidRev);
+        const isFul = isCountedForCost; // only charge shipping when revenue is generated
         if (o.line_items) o.line_items.forEach(li => allItems.push({...li, isDelivered: isCountedForCost, isFulfilled: isFul}));
       });
       const totalPrepaid = currentOrders.filter(isOrderPrepaidRevenue).length;
