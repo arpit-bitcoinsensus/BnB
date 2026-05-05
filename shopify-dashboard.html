@@ -454,7 +454,8 @@
           <table class="sheet-table">
             <thead>
               <tr>
-                <th>Product / SKU</th>
+                <th>Product</th>
+                <th style="width: 100px;">Status</th>
                 <th style="width: 150px;">Cost Price (CP)</th>
                 <th style="width: 150px;">Selling Price (SP)</th>
                 <th style="width: 180px;">Shipping/Fulfillment</th>
@@ -2552,6 +2553,7 @@
       });
 
       const groupedTitles = Object.keys(grouped).sort();
+      const pricingMeta = JSON.parse(localStorage.getItem('pricingMeta') || '{}');
 
       groupedTitles.forEach(title => {
         const group = grouped[title];
@@ -2563,14 +2565,38 @@
             : `<div style="font-size:11px; color:var(--text-muted);">${group.skus.length} variants</div>`;
             
         const encTitle = encodeURIComponent(title).replace(/'/g, "%27");
+        const meta = pricingMeta[title] || {};
+        const imageUrl = meta.image || '';
+        const status = meta.status || 'draft';
         
+        let statusHtml = '';
+        if (status === 'active') {
+            statusHtml = `<span style="background: rgba(167, 243, 208, 0.8); color: #065f46; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;">Active</span>`;
+        } else if (status === 'draft') {
+            statusHtml = `<span style="background: rgba(191, 219, 254, 0.8); color: #1e3a8a; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;">Draft</span>`;
+        } else if (status === 'archived') {
+            statusHtml = `<span style="background: rgba(254, 202, 202, 0.8); color: #991b1b; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;">Archived</span>`;
+        } else {
+            statusHtml = `<span style="background: rgba(228, 228, 231, 0.2); color: #a1a1aa; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: capitalize;">${status}</span>`;
+        }
+        
+        const imgHtml = imageUrl 
+             ? `<img src="${imageUrl}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover; border: 1px solid rgba(255,255,255,0.1);">`
+             : `<div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--text-muted);">📦</div>`;
+
         const row = document.createElement('tr');
         row.style.opacity = rowOpacity;
         row.innerHTML = `
           <td data-label="Product">
-            <div style="font-weight:600; color:white;">${title}</div>
-            ${skuListHtml}
+            <div style="display: flex; align-items: center; gap: 12px;">
+              ${imgHtml}
+              <div>
+                <div style="font-weight:600; color:white; margin-bottom: 2px;">${title}</div>
+                ${skuListHtml}
+              </div>
+            </div>
           </td>
+          <td data-label="Status">${statusHtml}</td>
           <td data-label="Cost Price (CP)"><input type="number" class="inline-input pricing-input" data-title="${encTitle}" data-field="cp" value="${group.cp}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
           <td data-label="Selling Price (SP)"><input type="number" class="inline-input pricing-input" data-title="${encTitle}" data-field="sp" value="${group.sp}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
           <td data-label="Shipping/Fulfillment"><input type="number" class="inline-input pricing-input" data-title="${encTitle}" data-field="shipping" value="${group.shipping}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
@@ -2699,9 +2725,15 @@
           }
         });
 
-        // 4. Update hidden status based on Shopify "active" status
+        // 4. Update hidden status based on Shopify "active" status and store image/status metadata
         if (shopifyProducts.length > 0) {
+          const pricingMeta = JSON.parse(localStorage.getItem('pricingMeta') || '{}');
           shopifyProducts.forEach(p => {
+            const title = p.title;
+            if (!pricingMeta[title]) pricingMeta[title] = {};
+            pricingMeta[title].image = p.image?.src || p.images?.[0]?.src || '';
+            pricingMeta[title].status = p.status;
+            
             p.variants.forEach(v => {
               const sku = v.sku || ('TITLE:' + p.title);
               if (p.status === 'active') {
@@ -2718,6 +2750,7 @@
             }
           });
           localStorage.setItem('hiddenPricingSKUs', JSON.stringify([...window.hiddenPricingSKUs]));
+          localStorage.setItem('pricingMeta', JSON.stringify(pricingMeta));
         }
 
         renderPricing();
