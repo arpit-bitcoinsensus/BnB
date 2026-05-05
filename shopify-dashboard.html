@@ -2160,7 +2160,27 @@
             renderDaily(dbMin, dbMax);
             const sStart = document.getElementById('scoreboard-start-date').value;
             const sEnd = document.getElementById('scoreboard-end-date').value;
-            if (sStart && sEnd) renderScoreboard(parseDateStr(sStart), parseDateStr(sEnd));
+            if (sStart && sEnd) {
+              // The scoreboard has its OWN independent date range, separate from the daily feed.
+              // Always fetch orders and ad costs specifically for the scoreboard range so the
+              // cumulative P&L is accurate regardless of what dates the daily feed is showing.
+              try {
+                const sbMinISO = new Date(sStart + 'T00:00:00+05:30').toISOString();
+                const sbMaxISO = new Date(sEnd + 'T23:59:59+05:30').toISOString();
+                const sbOrders = sbClient ? await fetchOrdersFromSupabase(sbMinISO, sbMaxISO) : state.orders;
+                const sbAdCosts = {};
+                if (sbClient) {
+                  const { data: adData } = await sbClient.from('ad_costs').select('date, amount').gte('date', sStart).lte('date', sEnd);
+                  if (adData) adData.forEach(r => sbAdCosts[r.date] = r.amount);
+                } else {
+                  Object.assign(sbAdCosts, state.adCosts);
+                }
+                renderScoreboard(parseDateStr(sStart), parseDateStr(sEnd), sbOrders, sbAdCosts);
+              } catch(e) {
+                console.error('Scoreboard fetch failed:', e);
+                renderScoreboard(parseDateStr(sStart), parseDateStr(sEnd));
+              }
+            }
           }
           else if (state.view === 'weekly') renderWeekly(parseDateStr(dbMin), parseDateStr(dbMax));
           else if (state.view === 'monthly') renderMonthly(parseDateStr(dbMin), parseDateStr(dbMax));
