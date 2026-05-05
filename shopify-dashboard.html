@@ -187,13 +187,33 @@
     .expand-btn { background: transparent; border: 1px solid var(--border); backdrop-filter: none; padding: 6px 12px; }
     .expand-btn:hover { background: rgba(255,255,255,0.05); }
 
-    /* Loading Overlay */
-    .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 500; flex-direction: column; backdrop-filter: blur(8px); }
-    .loading-overlay.active { display: flex; animation: fadeIn 0.3s ease; }
-    .spinner { width: 48px; height: 48px; border: 3px solid rgba(255,255,255,0.05); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
+    /* Premium Loading Overlay */
+    .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 5000; flex-direction: column; backdrop-filter: blur(12px); }
+    .loading-overlay.active { display: flex; animation: fadeIn 0.4s ease; }
     
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .radar-loader {
+      width: 80px; height: 80px; position: relative; margin-bottom: 24px;
+      border-radius: 50%; border: 1px solid rgba(139, 92, 246, 0.2);
+      box-shadow: 0 0 40px rgba(139, 92, 246, 0.1), inset 0 0 20px rgba(139, 92, 246, 0.1);
+      overflow: hidden;
+    }
+    .radar-loader::before {
+      content: ''; position: absolute; top: 50%; left: 50%; width: 100%; height: 100%;
+      background: conic-gradient(from 0deg, transparent 70%, rgba(139, 92, 246, 0.8) 100%);
+      transform-origin: 0 0; animation: spin 1.5s linear infinite;
+    }
+    .radar-loader::after {
+      content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px;
+      background: #c4b5fd; border-radius: 50%; transform: translate(-50%, -50%);
+      box-shadow: 0 0 10px 4px rgba(139, 92, 246, 0.5);
+    }
+    
+    .loading-title { font-size: 16px; font-weight: 600; color: white; letter-spacing: 1px; text-transform: uppercase; text-shadow: 0 0 10px rgba(255,255,255,0.2); animation: pulseText 2s ease-in-out infinite; }
+    .loading-subtitle { font-size: 13px; color: #a1a1aa; margin-top: 8px; font-family: monospace; }
+    
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; backdrop-filter: blur(0px); } to { opacity: 1; backdrop-filter: blur(12px); } }
+    @keyframes pulseText { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; text-shadow: 0 0 15px rgba(139, 92, 246, 0.5); } }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
     /* Sheet View Specific */
@@ -711,11 +731,11 @@
     </div>
   </div>
 
-  <!-- Loading Overlay -->
+  <!-- Premium Loading Overlay -->
   <div class="loading-overlay" id="loading">
-    <div class="spinner"></div>
-    <div style="font-weight:500;">Fetching Shopify Orders...</div>
-    <div style="font-size:12px; color:var(--text-muted); margin-top:8px;" id="loading-msg"></div>
+    <div class="radar-loader"></div>
+    <div class="loading-title" id="loading-title">Compiling Analytics...</div>
+    <div class="loading-subtitle" id="loading-msg">Connecting to Shopify secure socket...</div>
   </div>
 
   <!-- Intelligence Drawer -->
@@ -1592,10 +1612,19 @@
 
     function showLoading(msg) {
       document.getElementById('loading').classList.add('active');
-      document.getElementById('loading-msg').textContent = msg || '';
+      document.getElementById('loading-title').textContent = msg || 'Updating Data...';
+      
+      const msgs = ['Fetching Shopify nodes...', 'Parsing order ledgers...', 'Running AI profitability model...', 'Finalizing UI...'];
+      let step = 0;
+      window._loadingMsgInterval = setInterval(() => {
+        const msgEl = document.getElementById('loading-msg');
+        if(msgEl) msgEl.textContent = msgs[step % msgs.length];
+        step++;
+      }, 1500);
     }
     function hideLoading() {
       document.getElementById('loading').classList.remove('active');
+      clearInterval(window._loadingMsgInterval);
     }
 
     // Data Processing Utils
@@ -2206,9 +2235,9 @@
           }
         };
 
-        // Render immediately with local data
-        await renderUI();
-        if (!isForce) hideLoading();
+        // We will NOT render immediately with local data anymore.
+        // The user wants to wait for the sync to complete to avoid UI refresh lag.
+        // We will render UI at the end of runSync.
 
         // 3. Background Sync with Shopify (Non-blocking unless isForce)
         const runSync = async () => {
@@ -2255,12 +2284,14 @@
 
         if (isForce) {
           showLoading('Syncing with Shopify...');
-          await runSync();
-          hideLoading();
         } else {
-          // Fire and forget (silent background sync)
-          runSync();
+          showLoading('Fetching Live Data...');
         }
+        
+        // Wait for sync to complete before hiding loading overlay.
+        // runSync will call renderUI() once it has the freshest data.
+        await runSync();
+        hideLoading();
 
       } catch (error) {
         console.error("Error updating view:", error);
