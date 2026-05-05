@@ -2504,12 +2504,19 @@
 
     window.hiddenPricingSKUs = new Set(JSON.parse(localStorage.getItem('hiddenPricingSKUs') || '[]'));
     window.showHiddenProducts = false;
-    window.toggleHidePricing = function(sku) {
-      if (window.hiddenPricingSKUs.has(sku)) {
-        window.hiddenPricingSKUs.delete(sku);
-      } else {
-        window.hiddenPricingSKUs.add(sku);
-      }
+    window.hiddenPricingSKUs = new Set(JSON.parse(localStorage.getItem('hiddenPricingSKUs') || '[]'));
+    window.showHiddenProducts = false;
+    window.toggleHideGroup = function(encodedTitle) {
+      const title = decodeURIComponent(encodedTitle);
+      const skusToToggle = Object.keys(state.productPricing).filter(sku => state.productPricing[sku].title === title);
+      
+      if (skusToToggle.length === 0) return;
+      const isHidden = window.hiddenPricingSKUs.has(skusToToggle[0]);
+      
+      skusToToggle.forEach(sku => {
+         if (isHidden) window.hiddenPricingSKUs.delete(sku);
+         else window.hiddenPricingSKUs.add(sku);
+      });
       localStorage.setItem('hiddenPricingSKUs', JSON.stringify([...window.hiddenPricingSKUs]));
       renderPricing();
     };
@@ -2534,25 +2541,43 @@
         return;
       }
 
+      const grouped = {};
       skus.forEach(sku => {
         const p = state.productPricing[sku];
-        const isHidden = window.hiddenPricingSKUs.has(sku);
+        const title = p.title || 'Unknown Product';
+        if (!grouped[title]) {
+           grouped[title] = { skus: [], cp: p.cp, sp: p.sp, shipping: p.shipping, title };
+        }
+        grouped[title].skus.push(sku);
+      });
+
+      const groupedTitles = Object.keys(grouped).sort();
+
+      groupedTitles.forEach(title => {
+        const group = grouped[title];
+        const isHidden = group.skus.every(sku => window.hiddenPricingSKUs.has(sku));
         const rowOpacity = isHidden ? '0.4' : '1';
+        
+        const skuListHtml = group.skus.length === 1 
+            ? `<div style="font-size:11px; color:var(--text-muted);">${group.skus[0].startsWith('TITLE:') ? '(No SKU)' : group.skus[0]}</div>`
+            : `<div style="font-size:11px; color:var(--text-muted);">${group.skus.length} variants</div>`;
+            
+        const encTitle = encodeURIComponent(title).replace(/'/g, "%27");
         
         const row = document.createElement('tr');
         row.style.opacity = rowOpacity;
         row.innerHTML = `
           <td data-label="Product">
-            <div style="font-weight:600; color:white;">${p.title || 'Unknown Product'}</div>
-            <div style="font-size:11px; color:var(--text-muted);">${sku.startsWith('TITLE:') ? '(No SKU)' : sku}</div>
+            <div style="font-weight:600; color:white;">${title}</div>
+            ${skuListHtml}
           </td>
-          <td data-label="Cost Price (CP)"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="cp" value="${p.cp}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
-          <td data-label="Selling Price (SP)"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="sp" value="${p.sp}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
-          <td data-label="Shipping/Fulfillment"><input type="number" class="inline-input pricing-input" data-sku="${sku}" data-field="shipping" value="${p.shipping}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
+          <td data-label="Cost Price (CP)"><input type="number" class="inline-input pricing-input" data-title="${encTitle}" data-field="cp" value="${group.cp}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
+          <td data-label="Selling Price (SP)"><input type="number" class="inline-input pricing-input" data-title="${encTitle}" data-field="sp" value="${group.sp}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
+          <td data-label="Shipping/Fulfillment"><input type="number" class="inline-input pricing-input" data-title="${encTitle}" data-field="shipping" value="${group.shipping}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
           <td data-label="Action">
             <div style="display: flex; gap: 6px;">
-              <button class="expand-btn" onclick="saveSinglePricing('${sku}')" ${isHidden ? 'disabled' : ''}>Save</button>
-              <button class="expand-btn" onclick="toggleHidePricing('${sku}')" style="color:var(--text-muted);" title="Toggle visibility">
+              <button class="expand-btn" onclick="saveGroupPricing('${encTitle}')" ${isHidden ? 'disabled' : ''}>Save</button>
+              <button class="expand-btn" onclick="toggleHideGroup('${encTitle}')" style="color:var(--text-muted);" title="Toggle visibility">
                 ${isHidden ? 'Unhide' : 'Hide'}
               </button>
             </div>
@@ -2564,9 +2589,14 @@
       // Add event listeners to inputs to update state
       document.querySelectorAll('.pricing-input').forEach(input => {
         input.addEventListener('change', (e) => {
-          const sku = e.target.dataset.sku;
+          const title = decodeURIComponent(e.target.dataset.title);
           const field = e.target.dataset.field;
-          state.productPricing[sku][field] = parseFloat(e.target.value) || 0;
+          const val = parseFloat(e.target.value) || 0;
+          if (grouped[title]) {
+             grouped[title].skus.forEach(sku => {
+                state.productPricing[sku][field] = val;
+             });
+          }
         });
       });
     }
@@ -2595,22 +2625,31 @@
       }
     }
 
-    async function saveSinglePricing(sku) {
+    async function saveGroupPricing(encodedTitle) {
       if (!sbClient) return;
-      const p = state.productPricing[sku];
+      const title = decodeURIComponent(encodedTitle);
+      const skusToSave = Object.keys(state.productPricing).filter(sku => state.productPricing[sku].title === title);
+      
+      showLoading('Saving pricing...');
       try {
-        const { error } = await sbClient.from('product_pricing').upsert({
-          sku,
-          product_title: p.title,
-          cost_price: p.cp,
-          selling_price: p.sp,
-          shipping_charge: p.shipping,
-          updated_at: new Date().toISOString()
+        const rows = skusToSave.map(sku => {
+          const p = state.productPricing[sku];
+          return {
+            sku,
+            product_title: p.title,
+            cost_price: p.cp,
+            selling_price: p.sp,
+            shipping_charge: p.shipping,
+            updated_at: new Date().toISOString()
+          };
         });
+        const { error } = await sbClient.from('product_pricing').upsert(rows);
         if (error) throw error;
-        log(`Pricing for SKU ${sku} saved.`);
+        log(`Pricing for ${title} saved (${skusToSave.length} variants).`);
       } catch (e) {
-        log("Error saving single pricing: " + e.message);
+        log("Error saving group pricing: " + e.message);
+      } finally {
+        hideLoading();
       }
     }
 
