@@ -2051,18 +2051,32 @@
   }
 
     async function fetchOrdersFromSupabase(minDate, maxDate) {
-      const { data, error } = await sbClient
-        .from('orders')
-        .select('*, order_items(*)')
-        .gte('created_at', minDate)
-        .lte('created_at', maxDate)
-        .order('created_at', { ascending: false })
-        .limit(2000);
+      let allData = [];
+      let from = 0;
+      const step = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await sbClient
+          .from('orders')
+          .select('*, order_items(*)')
+          .gte('created_at', minDate)
+          .lte('created_at', maxDate)
+          .order('created_at', { ascending: false })
+          .range(from, from + step - 1);
+          
+        if(error) throw error;
         
-      if(error) throw error;
+        allData = allData.concat(data);
+        if (data.length < step) {
+          hasMore = false;
+        } else {
+          from += step;
+        }
+      }
 
       // Re-map column names to match what the UI expects (mimicking standard Shopify JSON struct)
-      return data.map(o => ({
+      return allData.map(o => ({
         id: o.id,
         name: o.name,
         created_at: o.created_at,
