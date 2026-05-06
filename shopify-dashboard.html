@@ -3142,20 +3142,9 @@
         });
 
         let totalItemsCount = 0;
-        let itemBreakdown = {};
         dayOrders.forEach(o => {
-          if (o.line_items) o.line_items.forEach(li => {
-            let qty = parseInt(li.quantity || 1);
-            totalItemsCount += qty;
-            const itemName = li.title || 'Unknown Item';
-            itemBreakdown[itemName] = (itemBreakdown[itemName] || 0) + qty;
-          });
+          if (o.line_items) o.line_items.forEach(li => totalItemsCount += parseInt(li.quantity || 1));
         });
-        
-        let itemBreakdownHtml = Object.entries(itemBreakdown)
-          .sort((a,b) => b[1] - a[1])
-          .map(([name, qty]) => `<div style="display:flex; justify-content:space-between; font-size:11px; margin-top:4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.05);"><span style="color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:85%;" title="${name.replace(/"/g, '&quot;')}">${name}</span><span style="font-weight:bold; color:#f8fafc;">${qty}</span></div>`)
-          .join('');
 
         // For fallback calcPL cost estimation: count prepaid as delivered
         const prepaidCount = dayOrders.filter(isOrderPrepaidRevenue).length;
@@ -3289,15 +3278,7 @@
 
           <div class="metrics-grid" style="margin-bottom: 24px;">
             <div class="metric-card clickable glow-white"  onclick="handleCardFilter('${dateStr}','orders',this)"><div class="metric-label">Orders</div><div class="metric-value">${dayOrders.length}</div></div>
-            <div class="metric-card glow-white" style="flex-direction: column; align-items: stretch; justify-content: flex-start;">
-              <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 8px;">
-                <div class="metric-label">Number of Items</div>
-                <div class="metric-value">${totalItemsCount}</div>
-              </div>
-              <div style="max-height: 80px; overflow-y: auto; padding-right: 4px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 4px; width: 100%;">
-                ${itemBreakdownHtml}
-              </div>
-            </div>
+            <div class="metric-card glow-white"><div class="metric-label">Number of Items</div><div class="metric-value">${totalItemsCount}</div></div>
             <div class="metric-card glow-white"><div class="metric-label">CPP</div><div class="metric-value">${totalItemsCount > 0 ? fmt(adCost / totalItemsCount) : '₹0'}</div></div>
             <div class="metric-card clickable glow-green"  onclick="handleCardFilter('${dateStr}','fulfilled',this)"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${tagsCounts['Fulfilled'] || 0}</div></div>
             <div class="metric-card clickable glow-green"  onclick="handleCardFilter('${dateStr}','delivered',this)"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${deliveredCount}</div></div>
@@ -3450,30 +3431,11 @@
       wPL.prepaidCount = wRevBreakdown.prepaidCount;
 
       let weeklyTotalItems = 0;
-      let weeklyItemBreakdown = {};
-      allViewItems.forEach(li => {
-        let qty = parseInt(li.quantity || 1);
-        weeklyTotalItems += qty;
-        const itemName = li.title || 'Unknown Item';
-        weeklyItemBreakdown[itemName] = (weeklyItemBreakdown[itemName] || 0) + qty;
-      });
-
-      let weeklyItemBreakdownHtml = Object.entries(weeklyItemBreakdown)
-        .sort((a,b) => b[1] - a[1])
-        .map(([name, qty]) => `<div style="display:flex; justify-content:space-between; font-size:11px; margin-top:4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.05);"><span style="color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:85%;" title="${name.replace(/"/g, '&quot;')}">${name}</span><span style="font-weight:bold; color:#f8fafc;">${qty}</span></div>`)
-        .join('');
+      allViewItems.forEach(li => weeklyTotalItems += parseInt(li.quantity || 1));
 
       document.getElementById('weekly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
-        <div class="metric-card" style="flex-direction: column; align-items: stretch; justify-content: flex-start;">
-          <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 8px;">
-            <div class="metric-label">Number of Items</div>
-            <div class="metric-value">${weeklyTotalItems}</div>
-          </div>
-          <div style="max-height: 80px; overflow-y: auto; padding-right: 4px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 4px; width: 100%;">
-            ${weeklyItemBreakdownHtml}
-          </div>
-        </div>
+        <div class="metric-card"><div class="metric-label">Number of Items</div><div class="metric-value">${weeklyTotalItems}</div></div>
         <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${wRet.repeatRate}%</div></div>
@@ -3581,18 +3543,7 @@
       mPL.prepaidCount = mRevBreakdown.prepaidCount;
 
       let monthlyTotalItems = 0;
-      let monthlyItemBreakdown = {};
-      allItems.forEach(li => {
-        let qty = parseInt(li.quantity || 1);
-        monthlyTotalItems += qty;
-        const itemName = li.title || 'Unknown Item';
-        monthlyItemBreakdown[itemName] = (monthlyItemBreakdown[itemName] || 0) + qty;
-      });
-
-      let monthlyItemBreakdownHtml = Object.entries(monthlyItemBreakdown)
-        .sort((a,b) => b[1] - a[1])
-        .map(([name, qty]) => `<div style="display:flex; justify-content:space-between; font-size:11px; margin-top:4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.05);"><span style="color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:85%;" title="${name.replace(/"/g, '&quot;')}">${name}</span><span style="font-weight:bold; color:#f8fafc;">${qty}</span></div>`)
-        .join('');
+      allItems.forEach(li => monthlyTotalItems += parseInt(li.quantity || 1));
       let totalNotConfirmed = 0;
       currentOrders.forEach(o => {
         const t = categorizeOrders([o]);
@@ -3601,15 +3552,7 @@
 
       document.getElementById('monthly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
-        <div class="metric-card" style="flex-direction: column; align-items: stretch; justify-content: flex-start;">
-          <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 8px;">
-            <div class="metric-label">Number of Items</div>
-            <div class="metric-value">${monthlyTotalItems}</div>
-          </div>
-          <div style="max-height: 80px; overflow-y: auto; padding-right: 4px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 4px; width: 100%;">
-            ${monthlyItemBreakdownHtml}
-          </div>
-        </div>
+        <div class="metric-card"><div class="metric-label">Number of Items</div><div class="metric-value">${monthlyTotalItems}</div></div>
         <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${mRet.repeatRate}%</div></div>
@@ -3749,30 +3692,11 @@
       const titleOverride = prefix === 'custom' ? 'Selected range' : 'Lifetime';
 
       let allTimeTotalItems = 0;
-      let allTimeItemBreakdown = {};
-      allItems.forEach(li => {
-        let qty = parseInt(li.quantity || 1);
-        allTimeTotalItems += qty;
-        const itemName = li.title || 'Unknown Item';
-        allTimeItemBreakdown[itemName] = (allTimeItemBreakdown[itemName] || 0) + qty;
-      });
-
-      let allTimeItemBreakdownHtml = Object.entries(allTimeItemBreakdown)
-        .sort((a,b) => b[1] - a[1])
-        .map(([name, qty]) => `<div style="display:flex; justify-content:space-between; font-size:11px; margin-top:4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.05);"><span style="color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:85%;" title="${name.replace(/"/g, '&quot;')}">${name}</span><span style="font-weight:bold; color:#f8fafc;">${qty}</span></div>`)
-        .join('');
+      allItems.forEach(li => allTimeTotalItems += parseInt(li.quantity || 1));
 
       document.getElementById(`${prefix}-metrics`).innerHTML = `
         <div class="metric-card"><div class="metric-label">${titleOverride} Orders</div><div class="metric-value">${totalOrders}</div></div>
-        <div class="metric-card" style="flex-direction: column; align-items: stretch; justify-content: flex-start;">
-          <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 8px;">
-            <div class="metric-label">Number of Items</div>
-            <div class="metric-value">${allTimeTotalItems}</div>
-          </div>
-          <div style="max-height: 80px; overflow-y: auto; padding-right: 4px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 4px; width: 100%;">
-            ${allTimeItemBreakdownHtml}
-          </div>
-        </div>
+        <div class="metric-card"><div class="metric-label">Number of Items</div><div class="metric-value">${allTimeTotalItems}</div></div>
         <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${atRet.repeatRate}%</div></div>
