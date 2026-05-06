@@ -3284,7 +3284,7 @@
 
           <div class="metrics-grid" style="margin-bottom: 24px;">
             <div class="metric-card clickable glow-white"  onclick="handleCardFilter('${dateStr}','orders',this)"><div class="metric-label">Orders</div><div class="metric-value">${dayOrders.length}</div></div>
-            <div class="metric-card clickable glow-white" onclick="showItemsBreakdown('${encodeURIComponent(JSON.stringify(itemBreakdownMap))}')"><div class="metric-label">Number of Items</div><div class="metric-value">${totalItemsCount}</div></div>
+            <div class="metric-card clickable glow-white" onclick="showItemsBreakdown('${encodeURIComponent(JSON.stringify(itemBreakdownMap)).replace(/'/g, "%27")}')"><div class="metric-label">Number of Items</div><div class="metric-value">${totalItemsCount}</div></div>
             <div class="metric-card glow-white"><div class="metric-label">CPP</div><div class="metric-value">${totalItemsCount > 0 ? fmt(adCost / totalItemsCount) : '₹0'}</div></div>
             <div class="metric-card clickable glow-green"  onclick="handleCardFilter('${dateStr}','fulfilled',this)"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${tagsCounts['Fulfilled'] || 0}</div></div>
             <div class="metric-card clickable glow-green"  onclick="handleCardFilter('${dateStr}','delivered',this)"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${deliveredCount}</div></div>
@@ -3296,7 +3296,7 @@
             ${(dateStr >= '2026-02-25') ? `<div class="metric-card clickable glow-red"    onclick="handleCardFilter('${dateStr}','rto',this)"><div class="metric-label">RTO / Undelivered</div><div class="metric-value text-loss">${tagsCounts['RTO'] || 0}</div></div>` : ''}
             <div class="metric-card clickable glow-yellow" onclick="handleCardFilter('${dateStr}','unreachable',this)"><div class="metric-label">Unreachable</div><div class="metric-value" style="color:#facc15">${tagsCounts['Unreachable'] || 0}</div></div>
             <div class="metric-card clickable glow-red" onclick="handleCardFilter('${dateStr}','not-confirmed',this)"><div class="metric-label" style="font-size:11px;">Order Not Confirmed</div><div class="metric-value text-loss">${tagsCounts['Not Confirmed'] || 0}</div></div>
-            <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(revBreakdown))}')"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
+            <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(revBreakdown)).replace(/'/g, "%27")}')"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
             <div class="metric-card">
               <div class="metric-label">Ad Spend</div>
               <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
@@ -3306,7 +3306,7 @@
             </div>
             ${(dateStr >= PREPAID_LAUNCH_DATE) ? `<div class="metric-card clickable glow-indigo" onclick="handleCardFilter('${dateStr}','prepaid',this)"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${paymentCounts.prepaid}</div></div>` : ''}
             ${(dateStr >= PREPAID_LAUNCH_DATE) ? `<div class="metric-card clickable glow-amber"  onclick="handleCardFilter('${dateStr}','cash',this)"><div class="metric-label">Cash Orders</div><div class="metric-value" style="color:#fb923c">${paymentCounts.cash}</div></div>` : ''}
-            <div class="metric-card clickable glow-white" onclick="showPLBreakdown('${encodeURIComponent(JSON.stringify(pl))}')"><div class="metric-label">Net Profit</div><div class="metric-value ${pl.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(pl.profit)}</div></div>
+            <div class="metric-card clickable glow-white" onclick="showPLBreakdown('${encodeURIComponent(JSON.stringify(pl)).replace(/'/g, "%27")}')"><div class="metric-label">Net Profit</div><div class="metric-value ${pl.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(pl.profit)}</div></div>
           </div>
 
           <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;" onclick="document.getElementById('orders-${dateStr}').style.display = document.getElementById('orders-${dateStr}').style.display === 'none' ? 'block' : 'none'">
@@ -3447,11 +3447,11 @@
 
       document.getElementById('weekly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
-        <div class="metric-card clickable glow-white" onclick="showItemsBreakdown('${encodeURIComponent(JSON.stringify(weeklyItemBreakdownMap))}')"><div class="metric-label">Number of Items</div><div class="metric-value">${weeklyTotalItems}</div></div>
+        <div class="metric-card clickable glow-white" onclick="showItemsBreakdown('${encodeURIComponent(JSON.stringify(weeklyItemBreakdownMap)).replace(/'/g, "%27")}')"><div class="metric-label">Number of Items</div><div class="metric-value">${weeklyTotalItems}</div></div>
         <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${wRet.repeatRate}%</div></div>
-        <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(wRevBreakdown))}')"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
+        <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(wRevBreakdown)).replace(/'/g, "%27")}')"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
         <div class="metric-card">
           <div class="metric-label">Ad Spend</div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
@@ -3459,7 +3459,7 @@
             <button class="inline-btn primary" id="btn-ad-weekly-save">Save</button>
           </div>
         </div>
-        <div class="metric-card clickable glow-white" onclick="showPLBreakdown('${encodeURIComponent(JSON.stringify(wPL))}')"><div class="metric-label">Net P&L</div><div class="metric-value ${wPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(wPL.profit)}</div></div>
+        <div class="metric-card clickable glow-white" onclick="showPLBreakdown('${encodeURIComponent(JSON.stringify(wPL)).replace(/'/g, "%27")}')"><div class="metric-label">Net P&L</div><div class="metric-value ${wPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(wPL.profit)}</div></div>
       `;
 
       renderPLTable('weekly', wPL, totalDelivered);
@@ -3570,7 +3570,7 @@
 
       document.getElementById('monthly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
-        <div class="metric-card clickable glow-white" onclick="showItemsBreakdown('${encodeURIComponent(JSON.stringify(monthlyItemBreakdownMap))}')"><div class="metric-label">Number of Items</div><div class="metric-value">${monthlyTotalItems}</div></div>
+        <div class="metric-card clickable glow-white" onclick="showItemsBreakdown('${encodeURIComponent(JSON.stringify(monthlyItemBreakdownMap)).replace(/'/g, "%27")}')"><div class="metric-label">Number of Items</div><div class="metric-value">${monthlyTotalItems}</div></div>
         <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${mRet.repeatRate}%</div></div>
@@ -3581,7 +3581,7 @@
         ${(mEnd >= new Date('2026-02-25T00:00:00')) ? `<div class="metric-card"><div class="metric-label">RTO / Undelivered</div><div class="metric-value text-loss">${totalRTO}</div></div>` : ''}
         <div class="metric-card"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${totalPrepaid}</div></div>
         <div class="metric-card"><div class="metric-label">Cash Orders</div><div class="metric-value" style="color:#fb923c">${totalCash}</div></div>
-        <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(mRevBreakdown))}')"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
+        <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(mRevBreakdown)).replace(/'/g, "%27")}')"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
         <div class="metric-card">
           <div class="metric-label">Ad Spend</div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
@@ -3589,7 +3589,7 @@
             <button class="inline-btn primary" id="btn-ad-monthly-save">Save</button>
           </div>
         </div>
-        <div class="metric-card clickable glow-white" onclick="showPLBreakdown('${encodeURIComponent(JSON.stringify(mPL))}')"><div class="metric-label">Net P&L</div><div class="metric-value ${mPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(mPL.profit)}</div></div>
+        <div class="metric-card clickable glow-white" onclick="showPLBreakdown('${encodeURIComponent(JSON.stringify(mPL)).replace(/'/g, "%27")}')"><div class="metric-label">Net P&L</div><div class="metric-value ${mPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(mPL.profit)}</div></div>
       `;
 
       renderPLTable('monthly', mPL, totalDelivered);
@@ -3720,12 +3720,12 @@
 
       document.getElementById(`${prefix}-metrics`).innerHTML = `
         <div class="metric-card"><div class="metric-label">${titleOverride} Orders</div><div class="metric-value">${totalOrders}</div></div>
-        <div class="metric-card clickable glow-white" onclick="showItemsBreakdown('${encodeURIComponent(JSON.stringify(allTimeItemBreakdownMap))}')"><div class="metric-label">Number of Items</div><div class="metric-value">${allTimeTotalItems}</div></div>
+        <div class="metric-card clickable glow-white" onclick="showItemsBreakdown('${encodeURIComponent(JSON.stringify(allTimeItemBreakdownMap)).replace(/'/g, "%27")}')"><div class="metric-label">Number of Items</div><div class="metric-value">${allTimeTotalItems}</div></div>
         <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${atRet.repeatRate}%</div></div>
         <div class="metric-card"><div class="metric-label" style="font-size:11px;">Order Not Confirmed</div><div class="metric-value text-loss">${totalNotConfirmed}</div></div>
-        <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(atRevBreakdown))}')"><div class="metric-label">${titleOverride} Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
+        <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(atRevBreakdown)).replace(/'/g, "%27")}')"><div class="metric-label">${titleOverride} Revenue</div><div class="metric-value">${fmtK(totalRevenue)}</div></div>
         <div class="metric-card">
           <div class="metric-label">${titleOverride} Ad Spend</div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
@@ -3733,7 +3733,7 @@
             <button class="inline-btn primary" id="btn-ad-${prefix}-save">Save</button>
           </div>
         </div>
-        <div class="metric-card clickable glow-white" onclick="showPLBreakdown('${encodeURIComponent(JSON.stringify(atPL))}')"><div class="metric-label">${titleOverride} Net P&L</div><div class="metric-value ${atPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(atPL.profit)}</div></div>
+        <div class="metric-card clickable glow-white" onclick="showPLBreakdown('${encodeURIComponent(JSON.stringify(atPL)).replace(/'/g, "%27")}')"><div class="metric-label">${titleOverride} Net P&L</div><div class="metric-value ${atPL.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(atPL.profit)}</div></div>
       `;
 
       // Update Chart Count
@@ -4299,30 +4299,51 @@
       const itemBreakdownMap = JSON.parse(decodeURIComponent(itemsStr));
       
       let totalQty = 0;
+      let uniqueProducts = 0;
+      
       let breakdownRows = Object.entries(itemBreakdownMap)
         .sort((a,b) => b[1] - a[1])
-        .map(([name, qty]) => {
+        .map(([name, qty], index) => {
           totalQty += qty;
+          uniqueProducts++;
+          const isEven = index % 2 === 0;
           return `
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; border-bottom:1px solid rgba(255,255,255,0.04);">
-              <span style="flex:3; color:#ddd; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${name.replace(/"/g, '&quot;')}">${name}</span>
-              <span style="flex:1; text-align:right; color:var(--primary); font-weight:700; font-size:15px;">${qty}</span>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:${isEven ? 'rgba(255,255,255,0.015)' : 'transparent'}; border-bottom:1px solid rgba(255,255,255,0.03); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='${isEven ? 'rgba(255,255,255,0.015)' : 'transparent'}'">
+              <div style="display:flex; align-items:center; flex:4; overflow:hidden; padding-right: 12px;">
+                <div style="min-width:28px; height:28px; border-radius:6px; background:rgba(99, 102, 241, 0.1); color:#818cf8; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; margin-right:12px; border:1px solid rgba(99, 102, 241, 0.2);">
+                  ${index + 1}
+                </div>
+                <span style="color:#e2e8f0; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:500;" title="${name.replace(/"/g, '&quot;')}">${name}</span>
+              </div>
+              <div style="flex:1; text-align:right;">
+                <span style="display:inline-block; background:rgba(16, 185, 129, 0.1); border:1px solid rgba(16, 185, 129, 0.2); color:#34d399; padding:4px 10px; border-radius:20px; font-weight:700; font-size:14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  ${qty} <span style="font-size:10px; opacity:0.8; font-weight:600; text-transform:uppercase; margin-left:2px;">Units</span>
+                </span>
+              </div>
             </div>
           `;
         }).join('');
 
       const content = `
-        <div style="overflow-y:auto; max-height:clamp(400px, 70vh, 680px); padding-right:2px;">
-          <div style="border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.08); margin-bottom:4px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:rgba(255,255,255,0.03); border-bottom:1px solid rgba(255,255,255,0.07);">
-              <span style="font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); font-weight:700;">Product</span>
-              <span style="font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); font-weight:700;">Quantity Ordered</span>
+        <div style="margin-bottom: 20px; text-align: center;">
+          <div style="display: inline-flex; gap: 16px; margin-bottom: 8px;">
+            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px 24px; border-radius: 12px;">
+              <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; font-weight: 600;">Total Items Ordered</div>
+              <div style="font-size: 24px; font-weight: 800; color: #34d399;">${totalQty}</div>
             </div>
-            ${breakdownRows || '<div style="padding: 16px; color: var(--text-muted); text-align: center;">No items found.</div>'}
+            <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); padding: 12px 24px; border-radius: 12px;">
+              <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; font-weight: 600;">Unique Products</div>
+              <div style="font-size: 24px; font-weight: 800; color: #818cf8;">${uniqueProducts}</div>
+            </div>
           </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:11px 16px; background:rgba(255,255,255,0.06); border-radius:10px; border:1px solid rgba(255,255,255,0.08); margin-top:16px;">
-            <span style="font-size:14px; font-weight:700; color:white;">Total Items</span>
-            <span style="font-size:17px; font-weight:800; color:white;">${totalQty}</span>
+        </div>
+        <div style="overflow-y:auto; max-height:clamp(300px, 60vh, 500px); padding-right:4px;">
+          <div style="border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2);">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:rgba(255,255,255,0.04); border-bottom:1px solid rgba(255,255,255,0.08); position: sticky; top: 0; z-index: 10; backdrop-filter: blur(8px);">
+              <span style="font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-muted); font-weight:700; margin-left: 40px;">Product Name</span>
+              <span style="font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-muted); font-weight:700;">Quantity</span>
+            </div>
+            ${breakdownRows || '<div style="padding: 32px; color: var(--text-muted); text-align: center; font-size: 15px;">No items found for this period.</div>'}
           </div>
         </div>
       `;
