@@ -3142,8 +3142,14 @@
         });
 
         let totalItemsCount = 0;
+        let itemBreakdownMap = {};
         dayOrders.forEach(o => {
-          if (o.line_items) o.line_items.forEach(li => totalItemsCount += parseInt(li.quantity || 1));
+          if (o.line_items) o.line_items.forEach(li => {
+            let qty = parseInt(li.quantity || 1);
+            totalItemsCount += qty;
+            let name = li.title || 'Unknown Item';
+            itemBreakdownMap[name] = (itemBreakdownMap[name] || 0) + qty;
+          });
         });
 
         // For fallback calcPL cost estimation: count prepaid as delivered
@@ -3278,7 +3284,7 @@
 
           <div class="metrics-grid" style="margin-bottom: 24px;">
             <div class="metric-card clickable glow-white"  onclick="handleCardFilter('${dateStr}','orders',this)"><div class="metric-label">Orders</div><div class="metric-value">${dayOrders.length}</div></div>
-            <div class="metric-card glow-white"><div class="metric-label">Number of Items</div><div class="metric-value">${totalItemsCount}</div></div>
+            <div class="metric-card clickable glow-white" onclick="showItemsBreakdown('${encodeURIComponent(JSON.stringify(itemBreakdownMap))}')"><div class="metric-label">Number of Items</div><div class="metric-value">${totalItemsCount}</div></div>
             <div class="metric-card glow-white"><div class="metric-label">CPP</div><div class="metric-value">${totalItemsCount > 0 ? fmt(adCost / totalItemsCount) : '₹0'}</div></div>
             <div class="metric-card clickable glow-green"  onclick="handleCardFilter('${dateStr}','fulfilled',this)"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${tagsCounts['Fulfilled'] || 0}</div></div>
             <div class="metric-card clickable glow-green"  onclick="handleCardFilter('${dateStr}','delivered',this)"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${deliveredCount}</div></div>
@@ -3431,11 +3437,17 @@
       wPL.prepaidCount = wRevBreakdown.prepaidCount;
 
       let weeklyTotalItems = 0;
-      allViewItems.forEach(li => weeklyTotalItems += parseInt(li.quantity || 1));
+      let weeklyItemBreakdownMap = {};
+      allViewItems.forEach(li => {
+        let qty = parseInt(li.quantity || 1);
+        weeklyTotalItems += qty;
+        let name = li.title || 'Unknown Item';
+        weeklyItemBreakdownMap[name] = (weeklyItemBreakdownMap[name] || 0) + qty;
+      });
 
       document.getElementById('weekly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
-        <div class="metric-card"><div class="metric-label">Number of Items</div><div class="metric-value">${weeklyTotalItems}</div></div>
+        <div class="metric-card clickable glow-white" onclick="showItemsBreakdown('${encodeURIComponent(JSON.stringify(weeklyItemBreakdownMap))}')"><div class="metric-label">Number of Items</div><div class="metric-value">${weeklyTotalItems}</div></div>
         <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${wRet.repeatRate}%</div></div>
@@ -3543,7 +3555,13 @@
       mPL.prepaidCount = mRevBreakdown.prepaidCount;
 
       let monthlyTotalItems = 0;
-      allItems.forEach(li => monthlyTotalItems += parseInt(li.quantity || 1));
+      let monthlyItemBreakdownMap = {};
+      allItems.forEach(li => {
+        let qty = parseInt(li.quantity || 1);
+        monthlyTotalItems += qty;
+        let name = li.title || 'Unknown Item';
+        monthlyItemBreakdownMap[name] = (monthlyItemBreakdownMap[name] || 0) + qty;
+      });
       let totalNotConfirmed = 0;
       currentOrders.forEach(o => {
         const t = categorizeOrders([o]);
@@ -3552,7 +3570,7 @@
 
       document.getElementById('monthly-metrics').innerHTML = `
         <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${totalOrders}</div></div>
-        <div class="metric-card"><div class="metric-label">Number of Items</div><div class="metric-value">${monthlyTotalItems}</div></div>
+        <div class="metric-card clickable glow-white" onclick="showItemsBreakdown('${encodeURIComponent(JSON.stringify(monthlyItemBreakdownMap))}')"><div class="metric-label">Number of Items</div><div class="metric-value">${monthlyTotalItems}</div></div>
         <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${mRet.repeatRate}%</div></div>
@@ -3692,11 +3710,17 @@
       const titleOverride = prefix === 'custom' ? 'Selected range' : 'Lifetime';
 
       let allTimeTotalItems = 0;
-      allItems.forEach(li => allTimeTotalItems += parseInt(li.quantity || 1));
+      let allTimeItemBreakdownMap = {};
+      allItems.forEach(li => {
+        let qty = parseInt(li.quantity || 1);
+        allTimeTotalItems += qty;
+        let name = li.title || 'Unknown Item';
+        allTimeItemBreakdownMap[name] = (allTimeItemBreakdownMap[name] || 0) + qty;
+      });
 
       document.getElementById(`${prefix}-metrics`).innerHTML = `
         <div class="metric-card"><div class="metric-label">${titleOverride} Orders</div><div class="metric-value">${totalOrders}</div></div>
-        <div class="metric-card"><div class="metric-label">Number of Items</div><div class="metric-value">${allTimeTotalItems}</div></div>
+        <div class="metric-card clickable glow-white" onclick="showItemsBreakdown('${encodeURIComponent(JSON.stringify(allTimeItemBreakdownMap))}')"><div class="metric-label">Number of Items</div><div class="metric-value">${allTimeTotalItems}</div></div>
         <div class="metric-card"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${totalFulfilled}</div></div>
         <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${totalDelivered}</div></div>
         <div class="metric-card"><div class="metric-label">Repeat Rate</div><div class="metric-value" style="color:var(--primary)">${atRet.repeatRate}%</div></div>
@@ -4271,7 +4295,58 @@
       document.getElementById('revenue-breakdown-modal').classList.remove('active');
     };
 
+    window.showItemsBreakdown = function(itemsStr) {
+      const itemBreakdownMap = JSON.parse(decodeURIComponent(itemsStr));
+      
+      let totalQty = 0;
+      let breakdownRows = Object.entries(itemBreakdownMap)
+        .sort((a,b) => b[1] - a[1])
+        .map(([name, qty]) => {
+          totalQty += qty;
+          return `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; border-bottom:1px solid rgba(255,255,255,0.04);">
+              <span style="flex:3; color:#ddd; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${name.replace(/"/g, '&quot;')}">${name}</span>
+              <span style="flex:1; text-align:right; color:var(--primary); font-weight:700; font-size:15px;">${qty}</span>
+            </div>
+          `;
+        }).join('');
+
+      const content = `
+        <div style="overflow-y:auto; max-height:clamp(400px, 70vh, 680px); padding-right:2px;">
+          <div style="border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.08); margin-bottom:4px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:rgba(255,255,255,0.03); border-bottom:1px solid rgba(255,255,255,0.07);">
+              <span style="font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); font-weight:700;">Product</span>
+              <span style="font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); font-weight:700;">Quantity Ordered</span>
+            </div>
+            ${breakdownRows || '<div style="padding: 16px; color: var(--text-muted); text-align: center;">No items found.</div>'}
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:11px 16px; background:rgba(255,255,255,0.06); border-radius:10px; border:1px solid rgba(255,255,255,0.08); margin-top:16px;">
+            <span style="font-size:14px; font-weight:700; color:white;">Total Items</span>
+            <span style="font-size:17px; font-weight:800; color:white;">${totalQty}</span>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('items-breakdown-content').innerHTML = content;
+      document.getElementById('items-breakdown-modal').classList.add('active');
+    };
+
+    window.closeItemsBreakdown = function(e) {
+      if (e && e.target !== e.currentTarget) return; 
+      document.getElementById('items-breakdown-modal').classList.remove('active');
+    };
+
   </script>
+
+  <div id="items-breakdown-modal" class="modal-overlay" onclick="closeItemsBreakdown(event)">
+    <div class="modal glass" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin:0;">Number of Items Breakdown</h2>
+        <button onclick="closeItemsBreakdown()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 24px; padding: 0; line-height: 1;">&times;</button>
+      </div>
+      <div id="items-breakdown-content"></div>
+    </div>
+  </div>
 
   <div id="pl-breakdown-modal" class="modal-overlay" onclick="closePLBreakdown(event)">
     <div class="modal glass" onclick="event.stopPropagation()">
