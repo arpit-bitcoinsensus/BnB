@@ -3539,7 +3539,11 @@
           <div class="metrics-grid" style="margin-bottom: 24px;">
             <div class="metric-card clickable glow-white"  onclick="handleCardFilter('${dateStr}','orders',this)"><div class="metric-label">Orders</div><div class="metric-value">${dayOrders.length}</div></div>
             <div class="metric-card clickable glow-white" onclick="showItemsBreakdown('${encodeURIComponent(JSON.stringify(itemBreakdownMap)).replace(/'/g, "%27")}')"><div class="metric-label">Number of Items</div><div class="metric-value">${totalItemsCount}</div></div>
-            <div class="metric-card glow-white"><div class="metric-label">CPP</div><div class="metric-value">${totalItemsCount > 0 ? fmt(adCost / totalItemsCount) : '₹0'}</div></div>
+            <div class="metric-card clickable glow-white" onclick="showDailyCPPBreakdown('${dateStr}', '${encodeURIComponent(JSON.stringify(itemBreakdownMap)).replace(/'/g, "%27")}')">
+              <div class="metric-label">CPP</div>
+              <div class="metric-value">${totalItemsCount > 0 ? fmt(adCost / totalItemsCount) : '₹0'}</div>
+              <div style="font-size:10px; color:var(--text-muted); margin-top:6px; opacity:0.7;">Click for product breakdown</div>
+            </div>
             <div class="metric-card clickable glow-green"  onclick="handleCardFilter('${dateStr}','fulfilled',this)"><div class="metric-label">Fulfilled</div><div class="metric-value" style="color:var(--profit-color)">${tagsCounts['Fulfilled'] || 0}</div></div>
             <div class="metric-card clickable glow-green"  onclick="handleCardFilter('${dateStr}','delivered',this)"><div class="metric-label">Delivered</div><div class="metric-value text-profit">${deliveredCount}</div></div>
             <div class="metric-card clickable glow-blue"   onclick="handleCardFilter('${dateStr}','in-transit',this)"><div class="metric-label">In Transit</div><div class="metric-value" style="color:#60a5fa">${tagsCounts['In Transit'] || 0}</div></div>
@@ -4573,7 +4577,69 @@
       document.getElementById('items-breakdown-modal').classList.remove('active');
     };
 
+    window.showDailyCPPBreakdown = function(dateStr, mapStr) {
+      const map = JSON.parse(decodeURIComponent(mapStr));
+      
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        document.getElementById('cpp-breakdown-date').textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } else {
+        document.getElementById('cpp-breakdown-date').textContent = dateStr;
+      }
+      
+      const dailyProductSpends = JSON.parse(localStorage.getItem('dailyProductAdCosts') || '{}');
+      const todaySpends = dailyProductSpends[dateStr] || {};
+      
+      const orderedToday = Object.keys(map);
+      const spentToday = Object.keys(todaySpends);
+      const uniqueProducts = [...new Set([...orderedToday, ...spentToday])];
+      
+      const listEl = document.getElementById('cpp-breakdown-list');
+      
+      if (uniqueProducts.length === 0) {
+        listEl.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding: 20px;">No products ordered and no ad spend recorded for this day.</div>';
+      } else {
+        listEl.innerHTML = uniqueProducts.map(p => {
+          const orders = map[p] || 0;
+          const spend = todaySpends[p] || 0;
+          const cpp = orders > 0 ? (spend / orders) : 0;
+          
+          return `
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+              <div style="font-weight: 600; font-size: 14px; margin-bottom: 8px; color: var(--primary);">${p}</div>
+              <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--text-muted);">
+                <div>Ad Spend: <span style="color: white;">₹${fmt(spend)}</span></div>
+                <div>Orders: <span style="color: white;">${orders}</span></div>
+                <div>CPP: <span style="color: #a78bfa; font-weight: 600;">${orders === 0 && spend > 0 ? 'N/A' : '₹' + fmt(cpp)}</span></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+      
+      document.getElementById('daily-cpp-breakdown-modal').classList.add('active');
+    };
+
+    window.closeDailyCPPBreakdown = function(e) {
+      if (e && e.target !== e.currentTarget) return;
+      document.getElementById('daily-cpp-breakdown-modal').classList.remove('active');
+    };
+
   </script>
+
+  <div id="daily-cpp-breakdown-modal" class="modal-overlay" onclick="closeDailyCPPBreakdown(event)">
+    <div class="modal glass" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin:0;">Per-Product CPP</h2>
+        <button onclick="closeDailyCPPBreakdown()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 24px; padding: 0; line-height: 1;">&times;</button>
+      </div>
+      <p style="margin-bottom: 8px; color: var(--text-muted); font-size: 13px;">Date: <span id="cpp-breakdown-date" style="font-weight:bold; color: white;"></span></p>
+      <div id="cpp-breakdown-list" style="max-height: 400px; overflow-y: auto; display:flex; flex-direction:column; gap:12px; margin-top:16px;">
+        <!-- JS renders list here -->
+      </div>
+    </div>
+  </div>
 
   <div id="items-breakdown-modal" class="modal-overlay" onclick="closeItemsBreakdown(event)">
     <div class="modal glass" onclick="event.stopPropagation()">
