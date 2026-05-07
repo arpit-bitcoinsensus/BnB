@@ -415,6 +415,7 @@
           <input type="date" id="products-end-date">
         </div>
         <button class="primary" id="btn-fetch-products">Analyze Products</button>
+        <button id="btn-connect-meta" style="margin-left:auto; background: rgba(59, 130, 246, 0.1); border: 1px solid #3b82f6; color: #60a5fa; font-size: 13px; font-weight: 600;">Connect Meta Ads</button>
       </div>
 
       <div class="sheet-container">
@@ -423,10 +424,12 @@
             <thead>
               <tr>
                 <th>Product Title</th>
-                <th style="width: 100px;">Sold</th>
-                <th style="width: 120px;">Revenue</th>
-                <th style="width: 120px;">Cost</th>
-                <th style="width: 120px;">Net Profit</th>
+                <th style="width: 80px;">Sold</th>
+                <th style="width: 100px;">Revenue</th>
+                <th style="width: 100px;">COGS</th>
+                <th style="width: 130px;">Ad Spend</th>
+                <th style="width: 90px;">CPP</th>
+                <th style="width: 100px;">Net Profit</th>
               </tr>
             </thead>
             <tbody id="products-tbody">
@@ -778,6 +781,29 @@
           <input type="text" id="chat-input" placeholder="Type a message..." style="flex:1; background:transparent; border:none; color:white; outline:none; font-size:13px;">
           <button id="btn-chat-send" style="background: var(--primary); color: #000; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;">Send</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Meta Ads Integration Modal -->
+  <div id="meta-modal" class="modal-overlay">
+    <div class="modal">
+      <h2 style="display:flex; align-items:center; gap:8px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="#1877F2"><path d="M12 2.04c-5.5 0-10 4.48-10 10.02 0 5 3.66 9.15 8.44 9.9v-7H7.9v-2.9h2.54V9.85c0-2.51 1.49-3.89 3.78-3.89 1.09 0 2.23.2 2.23.2v2.45h-1.26c-1.24 0-1.63.77-1.63 1.56v1.88h2.78l-.44 2.9h-2.34v7a10.04 10.04 0 008.44-9.9c0-5.54-4.5-10.02-10-10.02z"/></svg>
+        Connect Meta Ads
+      </h2>
+      <p>Enter your Meta API details to fetch ad spend and calculate CPP per product automatically. (Or skip and manually input ad spend below).</p>
+      <div class="form-group">
+        <label>Meta Ad Account ID (e.g. act_123456789)</label>
+        <input type="text" id="meta-ad-account-id" placeholder="act_...">
+      </div>
+      <div class="form-group">
+        <label>System User Access Token</label>
+        <input type="password" id="meta-access-token" placeholder="EAAB...">
+      </div>
+      <div style="display:flex; gap:12px; justify-content:flex-end;">
+        <button id="btn-close-meta" style="background:transparent; border:1px solid var(--border); color:white;">Cancel</button>
+        <button id="btn-save-meta" class="primary">Save & Connect</button>
       </div>
     </div>
   </div>
@@ -2789,9 +2815,9 @@
       `;
     }
 
-    function renderProducts(minDate, maxDate) {
+    async function renderProducts(minDate, maxDate) {
       const tbody = document.getElementById('products-tbody');
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px;">Analyzing product performance...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px;">Analyzing product performance...</td></tr>';
 
       // Use state.orders (already date-filtered) with their embedded line_items
       // order_items table does NOT store created_at, so we cannot filter by date directly on it
@@ -2804,36 +2830,111 @@
         const items = order.line_items || [];
         items.forEach(item => {
           const title = item.title || 'Unknown';
-          if (!stats[title]) stats[title] = { sold: 0, revenue: 0 };
+          if (!stats[title]) stats[title] = { sold: 0, revenue: 0, metaSpend: 0 };
           stats[title].sold += (item.quantity || 0);
           stats[title].revenue += ((item.quantity || 0) * parseFloat(item.price || 0));
           if (item.sku && !skuMap[title]) skuMap[title] = item.sku;
         });
       });
 
+      // Try fetching Meta Ad Spend automatically if credentials exist
+      const metaAccountId = localStorage.getItem('meta_ad_account_id');
+      const metaToken = localStorage.getItem('meta_access_token');
+      
+      if (metaAccountId && metaToken && minDate && maxDate) {
+        try {
+          const fbMin = new Date(minDate).toISOString().split('T')[0];
+          const fbMax = new Date(maxDate).toISOString().split('T')[0];
+          const url = `https://graph.facebook.com/v19.0/${metaAccountId}/insights?level=campaign&fields=campaign_name,spend&time_range={'since':'${fbMin}','until':'${fbMax}'}&access_token=${metaToken}`;
+          const resp = await fetch(url);
+          const data = await resp.json();
+          if (data.data) {
+            data.data.forEach(camp => {
+              const campName = (camp.campaign_name || '').toLowerCase();
+              const spend = parseFloat(camp.spend || 0);
+              // Simple mapping: if campaign name contains product title, allocate spend
+              Object.keys(stats).forEach(title => {
+                // Ignore small words or generic titles, simple match for now
+                if (title.length > 3 && campName.includes(title.toLowerCase())) {
+                  stats[title].metaSpend += spend;
+                }
+              });
+            });
+          }
+        } catch (e) {
+          console.error("Meta Ads fetch failed", e);
+        }
+      }
+
+      // Load manual ad spends from localStorage as fallback
+      const manualSpends = JSON.parse(localStorage.getItem('manualProductAdSpends') || '{}');
+
       const sorted = Object.entries(stats).sort((a, b) => b[1].revenue - a[1].revenue);
 
       if (sorted.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted)">No product data found for this range. Try clicking "Analyze Products" after selecting a date range.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px; color:var(--text-muted)">No product data found for this range. Try clicking "Analyze Products" after selecting a date range.</td></tr>';
         return;
       }
+
+      window.updateProductAdSpend = function(title, spendInput) {
+        const spends = JSON.parse(localStorage.getItem('manualProductAdSpends') || '{}');
+        spends[title] = parseFloat(spendInput) || 0;
+        localStorage.setItem('manualProductAdSpends', JSON.stringify(spends));
+        // Re-render
+        renderProducts(document.getElementById('products-start-date').value, document.getElementById('products-end-date').value);
+      };
 
       tbody.innerHTML = sorted.map(([title, s]) => {
         const sku = skuMap[title] || '';
         const pricing = state.productPricing[sku] || { cp: PRODUCT_COST, shipping: SHIPPING_COST };
         const cost = s.sold * (pricing.cp + pricing.shipping);
-        const profit = s.revenue - cost;
+        
+        // Use Meta spend if > 0, else fallback to manual input for this product
+        const adSpend = s.metaSpend > 0 ? s.metaSpend : (manualSpends[title] || 0);
+        const cpp = s.sold > 0 ? (adSpend / s.sold) : 0;
+        const profit = s.revenue - cost - adSpend;
+        
         return `
           <tr>
             <td>${title} <div style="font-size:10px; color:var(--text-muted)">${sku}</div></td>
             <td style="font-weight:600;">${s.sold}</td>
             <td>${fmt(s.revenue)}</td>
             <td class="text-loss">${fmt(cost)}</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:4px;">
+                <span style="color:var(--text-muted)">₹</span>
+                <input type="number" value="${adSpend}" 
+                       onchange="updateProductAdSpend('${title.replace(/'/g, "\\'")}', this.value)"
+                       ${s.metaSpend > 0 ? 'disabled title="Fetched from Meta Ads"' : ''}
+                       style="width: 80px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: white; padding: 6px 8px; border-radius: 4px; font-size: 13px; outline: none; ${s.metaSpend > 0 ? 'opacity: 0.7;' : ''}">
+              </div>
+            </td>
+            <td><span style="background: rgba(167, 139, 250, 0.15); color: #a78bfa; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; border: 1px solid rgba(167, 139, 250, 0.3);">₹${fmt(cpp)}</span></td>
             <td class="${profit >= 0 ? 'text-profit' : 'text-loss'}" style="font-weight:700;">${fmt(profit)}</td>
           </tr>
         `;
       }).join('');
     }
+
+    // Meta Ads Modal Logic
+    document.getElementById('btn-connect-meta')?.addEventListener('click', () => {
+      document.getElementById('meta-ad-account-id').value = localStorage.getItem('meta_ad_account_id') || '';
+      document.getElementById('meta-access-token').value = localStorage.getItem('meta_access_token') || '';
+      document.getElementById('meta-modal').classList.add('active');
+    });
+
+    document.getElementById('btn-close-meta')?.addEventListener('click', () => {
+      document.getElementById('meta-modal').classList.remove('active');
+    });
+
+    document.getElementById('btn-save-meta')?.addEventListener('click', () => {
+      const accId = document.getElementById('meta-ad-account-id').value.trim();
+      const token = document.getElementById('meta-access-token').value.trim();
+      localStorage.setItem('meta_ad_account_id', accId);
+      localStorage.setItem('meta_access_token', token);
+      document.getElementById('meta-modal').classList.remove('active');
+      fetchCurrentView(true); // refresh products view
+    });
 
     function exportToCSV() {
       if (state.orders.length === 0) return alert("No data to export.");
