@@ -827,10 +827,10 @@
       </div>
       
       <div style="border-top: 1px solid var(--border); padding-top: 16px; display: flex; gap: 8px;">
-        <select id="adspend-add-product" style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: white; border-radius: 6px; padding: 8px; outline: none;">
+        <select id="adspend-add-product" style="flex: 1; min-width: 0; text-overflow: ellipsis; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: white; border-radius: 6px; padding: 8px; outline: none;">
           <option value="">+ Pick product from inventory</option>
         </select>
-        <button class="primary" onclick="addAdSpendProductRow()">Add</button>
+        <button class="primary" style="flex-shrink: 0;" onclick="addAdSpendProductRow()">Add</button>
       </div>
       
       <div style="text-align: right; margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
