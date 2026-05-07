@@ -66,9 +66,9 @@
     button.primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
 
     /* Modal */
-    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 2000; backdrop-filter: blur(5px); }
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 2000; backdrop-filter: blur(5px); padding: 16px; box-sizing: border-box; }
     .modal-overlay.active { display: flex; animation: fadeIn 0.3s ease; }
-    .modal { padding: 32px; border-radius: 16px; width: 100%; max-width: 400px; }
+    .modal { padding: 32px; border-radius: 16px; width: 100%; max-width: 400px; box-sizing: border-box; }
     .modal h2 { margin-top: 0; font-size: 24px; margin-bottom: 8px; }
     .modal p { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
     .form-group { margin-bottom: 20px; }
@@ -817,7 +817,7 @@
       <div style="margin-bottom: 24px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid var(--border);">
         <label style="font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Total Ad Spend for the Day</label>
         <div style="display:flex; gap: 12px; margin-top: 8px;">
-          <input type="number" id="modal-total-adspend" class="inline-input" style="flex: 1; font-size: 16px; padding: 10px; width: 100%; text-align: left;">
+          <input type="number" id="modal-total-adspend" class="inline-input" style="flex: 1; font-size: 16px; padding: 10px; width: 100%; text-align: left; box-sizing: border-box;">
         </div>
       </div>
       
@@ -827,7 +827,7 @@
       </div>
       
       <div style="border-top: 1px solid var(--border); padding-top: 16px; display: flex; gap: 8px;">
-        <select id="adspend-add-product" style="flex: 1; min-width: 0; text-overflow: ellipsis; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: white; border-radius: 6px; padding: 8px; outline: none;">
+        <select id="adspend-add-product" style="flex: 1; min-width: 0; box-sizing: border-box; text-overflow: ellipsis; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: white; border-radius: 6px; padding: 8px; outline: none;">
           <option value="">+ Pick product from inventory</option>
         </select>
         <button class="primary" style="flex-shrink: 0;" onclick="addAdSpendProductRow()">Add</button>
