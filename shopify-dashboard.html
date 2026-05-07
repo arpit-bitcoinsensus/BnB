@@ -4600,22 +4600,46 @@
       if (uniqueProducts.length === 0) {
         listEl.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding: 20px;">No products ordered and no ad spend recorded for this day.</div>';
       } else {
-        listEl.innerHTML = uniqueProducts.map(p => {
+        let html = `
+          <div class="sheet-container" style="margin: 0; max-height: 100%;">
+            <table class="sheet-table" style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr>
+                  <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; color: var(--text-muted);">Product</th>
+                  <th style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; color: var(--text-muted);">Orders</th>
+                  <th style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; color: var(--text-muted);">Ad Spend</th>
+                  <th style="padding: 12px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; color: var(--text-muted);">CPP</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+        
+        html += uniqueProducts.map(p => {
           const orders = map[p] || 0;
           const spend = todaySpends[p] || 0;
           const cpp = orders > 0 ? (spend / orders) : 0;
           
           return `
-            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-              <div style="font-weight: 600; font-size: 14px; margin-bottom: 8px; color: var(--primary);">${p}</div>
-              <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--text-muted);">
-                <div>Ad Spend: <span style="color: white;">₹${fmt(spend)}</span></div>
-                <div>Orders: <span style="color: white;">${orders}</span></div>
-                <div>CPP: <span style="color: #a78bfa; font-weight: 600;">${orders === 0 && spend > 0 ? 'N/A' : '₹' + fmt(cpp)}</span></div>
-              </div>
-            </div>
+            <tr>
+              <td style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border); max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;" title="${p.replace(/"/g, '&quot;')}">${p}</td>
+              <td style="text-align: center; padding: 12px; border-bottom: 1px solid var(--border); font-weight: 600;">${orders}</td>
+              <td style="text-align: center; padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-muted);">₹${fmt(spend)}</td>
+              <td style="text-align: center; padding: 12px; border-bottom: 1px solid var(--border);">
+                <span style="background: rgba(167, 139, 250, 0.15); color: #a78bfa; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; border: 1px solid rgba(167, 139, 250, 0.3);">
+                  ${orders === 0 && spend > 0 ? 'N/A' : '₹' + fmt(cpp)}
+                </span>
+              </td>
+            </tr>
           `;
         }).join('');
+        
+        html += `
+              </tbody>
+            </table>
+          </div>
+        `;
+        
+        listEl.innerHTML = html;
       }
       
       document.getElementById('daily-cpp-breakdown-modal').classList.add('active');
