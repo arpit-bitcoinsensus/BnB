@@ -808,6 +808,38 @@
     </div>
   </div>
 
+  <!-- Daily Ad Spend Breakdown Modal -->
+  <div id="daily-adspend-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 500px;">
+      <h2>Ad Spend - <span id="adspend-modal-date"></span></h2>
+      <input type="hidden" id="adspend-modal-datestr">
+      
+      <div style="margin-bottom: 24px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid var(--border);">
+        <label style="font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Total Ad Spend for the Day</label>
+        <div style="display:flex; gap: 12px; margin-top: 8px;">
+          <input type="number" id="modal-total-adspend" class="inline-input" style="flex: 1; font-size: 16px; padding: 10px; width: 100%; text-align: left;">
+        </div>
+      </div>
+      
+      <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; font-weight: 600;">Per-Product Breakdown</div>
+      <div id="adspend-products-list" style="max-height: 300px; overflow-y: auto; margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px;">
+        <!-- Product rows rendered here -->
+      </div>
+      
+      <div style="border-top: 1px solid var(--border); padding-top: 16px; display: flex; gap: 8px;">
+        <select id="adspend-add-product" style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: white; border-radius: 6px; padding: 8px; outline: none;">
+          <option value="">+ Pick product from inventory</option>
+        </select>
+        <button class="primary" onclick="addAdSpendProductRow()">Add</button>
+      </div>
+      
+      <div style="text-align: right; margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
+        <button onclick="document.getElementById('daily-adspend-modal').classList.remove('active')" style="background:transparent; border:1px solid var(--border); color:white; padding: 8px 16px; border-radius: 6px; font-weight:600; cursor:pointer;">Cancel</button>
+        <button class="primary" onclick="saveDailyAdSpendModal()">Save Breakdown</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Passcode Overlay -->
   <div id="login-overlay" class="login-overlay">
     <div class="login-box">
@@ -2868,6 +2900,18 @@
 
       // Load manual ad spends from localStorage as fallback
       const manualSpends = JSON.parse(localStorage.getItem('manualProductAdSpends') || '{}');
+      const dailySpends = JSON.parse(localStorage.getItem('dailyProductAdCosts') || '{}');
+
+      // Aggregate daily ad spend for each product over the selected date range
+      const rangeSpends = {};
+      for (let d = new Date(minDate); d <= new Date(maxDate); d.setDate(d.getDate() + 1)) {
+        const dStr = toDateStr(d);
+        if (dailySpends[dStr]) {
+          Object.keys(dailySpends[dStr]).forEach(p => {
+            rangeSpends[p] = (rangeSpends[p] || 0) + dailySpends[dStr][p];
+          });
+        }
+      }
 
       const sorted = Object.entries(stats).sort((a, b) => b[1].revenue - a[1].revenue);
 
@@ -2889,8 +2933,8 @@
         const pricing = state.productPricing[sku] || { cp: PRODUCT_COST, shipping: SHIPPING_COST };
         const cost = s.sold * (pricing.cp + pricing.shipping);
         
-        // Use Meta spend if > 0, else fallback to manual input for this product
-        const adSpend = s.metaSpend > 0 ? s.metaSpend : (manualSpends[title] || 0);
+        // Use Meta spend if > 0, else fallback to range aggregate, then global manual input
+        const adSpend = s.metaSpend > 0 ? s.metaSpend : (rangeSpends[title] || manualSpends[title] || 0);
         const cpp = s.sold > 0 ? (adSpend / s.sold) : 0;
         const profit = s.revenue - cost - adSpend;
         
@@ -2935,6 +2979,112 @@
       document.getElementById('meta-modal').classList.remove('active');
       fetchCurrentView(true); // refresh products view
     });
+
+    window.openDailyAdSpendModal = function(dateStr) {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        document.getElementById('adspend-modal-date').textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } else {
+        document.getElementById('adspend-modal-date').textContent = dateStr;
+      }
+      document.getElementById('adspend-modal-datestr').value = dateStr;
+      
+      const totalAd = state.adCosts[dateStr] || 0;
+      document.getElementById('modal-total-adspend').value = totalAd;
+      
+      const dailyProductSpends = JSON.parse(localStorage.getItem('dailyProductAdCosts') || '{}');
+      const todaySpends = dailyProductSpends[dateStr] || {};
+      
+      const orderedToday = window._dayProducts?.[dateStr] || [];
+      const existingSpends = Object.keys(todaySpends);
+      const uniqueProducts = [...new Set([...orderedToday, ...existingSpends])];
+      
+      const listEl = document.getElementById('adspend-products-list');
+      if (uniqueProducts.length === 0) {
+        listEl.innerHTML = '<div style="color:var(--text-muted); font-size:13px; padding: 8px 0;">No items ordered this day. You can add items below.</div>';
+      } else {
+        listEl.innerHTML = uniqueProducts.map(p => {
+          const val = todaySpends[p] || '';
+          return `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding: 8px 12px; border-radius:6px; border:1px solid var(--border);">
+              <div style="font-weight:600; font-size:13px; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${p.replace(/"/g, '&quot;')}">${p}</div>
+              <div style="display:flex; align-items:center; gap:4px;">
+                <span style="color:var(--text-muted); font-size:12px;">₹</span>
+                <input type="number" class="modal-product-adspend-input" data-product="${p.replace(/"/g, '&quot;')}" value="${val}" placeholder="0" style="width: 80px; padding: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: white; border-radius: 4px; outline: none;">
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+      
+      const selectEl = document.getElementById('adspend-add-product');
+      selectEl.innerHTML = '<option value="">+ Pick product from inventory</option>';
+      const allKnownProducts = Object.values(state.productPricing || {}).map(p => p.title);
+      let fallbackProducts = [];
+      (state.orders || []).forEach(o => { o.line_items?.forEach(li => fallbackProducts.push(li.title)); });
+      const globalUnique = [...new Set([...allKnownProducts, ...fallbackProducts])];
+      
+      globalUnique.sort().forEach(p => {
+        if(!uniqueProducts.includes(p) && p) {
+          selectEl.innerHTML += `<option value="${p.replace(/"/g, '&quot;')}">${p}</option>`;
+        }
+      });
+      
+      document.getElementById('daily-adspend-modal').classList.add('active');
+    };
+
+    window.addAdSpendProductRow = function() {
+      const selectEl = document.getElementById('adspend-add-product');
+      const p = selectEl.value;
+      if (!p) return;
+      
+      const listEl = document.getElementById('adspend-products-list');
+      if (listEl.innerHTML.includes('No items ordered')) {
+        listEl.innerHTML = '';
+      }
+      listEl.insertAdjacentHTML('beforeend', `
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding: 8px 12px; border-radius:6px; border:1px solid var(--border);">
+          <div style="font-weight:600; font-size:13px; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${p.replace(/"/g, '&quot;')}">${p}</div>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span style="color:var(--text-muted); font-size:12px;">₹</span>
+            <input type="number" class="modal-product-adspend-input" data-product="${p.replace(/"/g, '&quot;')}" value="" placeholder="0" style="width: 80px; padding: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: white; border-radius: 4px; outline: none;">
+          </div>
+        </div>
+      `);
+      
+      const opt = selectEl.querySelector(`option[value="${p.replace(/"/g, '\\"')}"]`);
+      if(opt) opt.remove();
+      selectEl.value = "";
+    };
+
+    window.saveDailyAdSpendModal = function() {
+      const dateStr = document.getElementById('adspend-modal-datestr').value;
+      const totalAd = document.getElementById('modal-total-adspend').value;
+      
+      saveAdCost(dateStr, totalAd);
+      
+      const inputs = document.querySelectorAll('.modal-product-adspend-input');
+      const dailySpends = JSON.parse(localStorage.getItem('dailyProductAdCosts') || '{}');
+      if (!dailySpends[dateStr]) dailySpends[dateStr] = {};
+      
+      inputs.forEach(inp => {
+        const p = inp.getAttribute('data-product');
+        const v = parseFloat(inp.value);
+        if (v > 0) {
+          dailySpends[dateStr][p] = v;
+        } else {
+          delete dailySpends[dateStr][p];
+        }
+      });
+      
+      localStorage.setItem('dailyProductAdCosts', JSON.stringify(dailySpends));
+      document.getElementById('daily-adspend-modal').classList.remove('active');
+      
+      const dStartStr = document.getElementById('daily-start-date').value;
+      const dEndStr = document.getElementById('daily-end-date').value;
+      renderDaily(dStartStr, dEndStr);
+    };
 
     function exportToCSV() {
       if (state.orders.length === 0) return alert("No data to export.");
@@ -3253,6 +3403,9 @@
           });
         });
 
+        window._dayProducts = window._dayProducts || {};
+        window._dayProducts[dateStr] = Object.keys(itemBreakdownMap);
+
         // For fallback calcPL cost estimation: count prepaid as delivered
         const prepaidCount = dayOrders.filter(isOrderPrepaidRevenue).length;
         const revenueCount = deliveredCount + prepaidCount;
@@ -3398,12 +3551,10 @@
             <div class="metric-card clickable glow-yellow" onclick="handleCardFilter('${dateStr}','unreachable',this)"><div class="metric-label">Unreachable</div><div class="metric-value" style="color:#facc15">${tagsCounts['Unreachable'] || 0}</div></div>
             <div class="metric-card clickable glow-red" onclick="handleCardFilter('${dateStr}','not-confirmed',this)"><div class="metric-label" style="font-size:11px;">Order Not Confirmed</div><div class="metric-value text-loss">${tagsCounts['Not Confirmed'] || 0}</div></div>
             <div class="metric-card clickable glow-blue" onclick="showRevenueBreakdown('${encodeURIComponent(JSON.stringify(revBreakdown)).replace(/'/g, "%27")}')"><div class="metric-label">Revenue</div><div class="metric-value">${fmtK(revenue)}</div></div>
-            <div class="metric-card">
+            <div class="metric-card clickable glow-white" onclick="openDailyAdSpendModal('${dateStr}')">
               <div class="metric-label">Ad Spend</div>
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
-                <input type="number" id="ad-${dateStr}" class="inline-input" value="${adCost}" style="width:70px; padding:6px; font-size:16px;"/>
-                <button class="inline-btn primary" id="btn-ad-${dateStr}">Save</button>
-              </div>
+              <div class="metric-value">${fmtK(adCost)}</div>
+              <div style="font-size:10px; color:var(--text-muted); margin-top:6px; opacity:0.7;">Click to edit breakdown</div>
             </div>
             ${(dateStr >= PREPAID_LAUNCH_DATE) ? `<div class="metric-card clickable glow-indigo" onclick="handleCardFilter('${dateStr}','prepaid',this)"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${paymentCounts.prepaid}</div></div>` : ''}
             ${(dateStr >= PREPAID_LAUNCH_DATE) ? `<div class="metric-card clickable glow-amber"  onclick="handleCardFilter('${dateStr}','cash',this)"><div class="metric-label">Cash Orders</div><div class="metric-value" style="color:#fb923c">${paymentCounts.cash}</div></div>` : ''}
@@ -3444,23 +3595,6 @@
         feedContainer.appendChild(el);
       }
 
-      // Attach event listeners for Ad Cost
-      dayBlocks.forEach(el => {
-        const btn = el.querySelector('button[id^="btn-ad-"]');
-        if (btn) {
-          btn.addEventListener('click', (e) => {
-            const dateStr = e.target.id.replace('btn-ad-', '');
-            const val = document.getElementById(`ad-${dateStr}`).value;
-            saveAdCost(dateStr, val).then(() => {
-               // Soft re-render to update UI immediately
-               const dStartStr = document.getElementById('daily-start-date').value;
-               const dEndStr = document.getElementById('daily-end-date').value;
-               renderDaily(dStartStr, dEndStr);
-            });
-          });
-        }
-      });
-      
       if(dayBlocks.length === 0) {
         feedContainer.innerHTML = '<div class="empty-state">No days selected or invalid date range.</div>';
       }
