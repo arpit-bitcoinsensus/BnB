@@ -315,6 +315,107 @@
       .tags-grid { grid-template-columns: 1fr; }
       .header-controls button { width: 100%; }
     }
+
+    /* ── Day Product PNL Modal ───────────────────────────────── */
+    #day-pnl-modal.modal-overlay { align-items: flex-end; padding: 0; }
+    @media (min-width: 600px) { #day-pnl-modal.modal-overlay { align-items: center; padding: 16px; } }
+    #day-pnl-modal .dpnl-sheet {
+      background: #0f0f0f;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px 20px 0 0;
+      width: 100%; max-width: 680px;
+      max-height: 90vh;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      animation: slideUp 0.35s cubic-bezier(0.4,0,0.2,1);
+    }
+    @media (min-width: 600px) {
+      #day-pnl-modal .dpnl-sheet { border-radius: 20px; max-height: 85vh; }
+    }
+    @keyframes slideUp { from { transform: translateY(60px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    .dpnl-header {
+      padding: 24px 28px 20px;
+      background: linear-gradient(135deg, rgba(251,191,36,0.1) 0%, rgba(0,0,0,0) 60%);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      display: flex; justify-content: space-between; align-items: flex-start;
+      flex-shrink: 0;
+    }
+    .dpnl-header-left .dpnl-eyebrow {
+      font-size: 10px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 1.5px; color: #fbbf24; margin-bottom: 6px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .dpnl-header-left h2 { margin: 0; font-size: 20px; font-weight: 700; color: #fff; }
+    .dpnl-header-left .dpnl-date { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+    .dpnl-close-btn {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      color: #a1a1aa; width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 18px; transition: all 0.2s; flex-shrink: 0;
+    }
+    .dpnl-close-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+    /* Summary bar */
+    .dpnl-summary-bar {
+      display: flex; gap: 0;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      flex-shrink: 0;
+    }
+    .dpnl-summary-item {
+      flex: 1; padding: 12px 16px;
+      border-right: 1px solid rgba(255,255,255,0.07);
+      text-align: center;
+    }
+    .dpnl-summary-item:last-child { border-right: none; }
+    .dpnl-summary-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 3px; }
+    .dpnl-summary-val { font-size: 16px; font-weight: 700; font-family: 'Outfit', sans-serif; }
+
+    /* Table area */
+    .dpnl-table-wrap { flex: 1; overflow-y: auto; padding: 0; }
+    .dpnl-table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+    }
+    .dpnl-table thead tr {
+      background: rgba(255,255,255,0.03);
+      position: sticky; top: 0; z-index: 1;
+    }
+    .dpnl-table th {
+      padding: 11px 16px;
+      text-align: left; font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--text-muted); font-weight: 700;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .dpnl-table th:not(:first-child) { text-align: right; }
+    .dpnl-table td {
+      padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.05);
+      vertical-align: middle;
+    }
+    .dpnl-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+    .dpnl-table tbody tr { transition: background 0.15s; }
+    .dpnl-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+    .dpnl-table tbody tr:last-child td { border-bottom: none; }
+
+    /* Product name cell */
+    .dpnl-product-name { font-weight: 600; color: #fff; }
+    .dpnl-product-qty {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: rgba(251,191,36,0.12); color: #fbbf24;
+      border: 1px solid rgba(251,191,36,0.25);
+      border-radius: 5px; font-size: 10px; font-weight: 800;
+      padding: 2px 7px; margin-left: 6px; vertical-align: middle;
+    }
+
+    /* Totals row */
+    .dpnl-total-row td {
+      border-top: 2px solid rgba(255,255,255,0.12) !important;
+      font-weight: 700; font-size: 14px;
+      background: rgba(255,255,255,0.02);
+    }
+    .dpnl-table tfoot .dpnl-total-row td:first-child { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* No data */
+    .dpnl-empty { padding: 48px; text-align: center; color: var(--text-muted); }
   </style>
 </head>
 <body>
@@ -837,6 +938,50 @@
         <button onclick="document.getElementById('daily-adspend-modal').classList.remove('active')" style="background:transparent; border:1px solid var(--border); color:white; padding: 8px 16px; border-radius: 6px; font-weight:600; cursor:pointer;">Cancel</button>
         <button class="primary" onclick="saveDailyAdSpendModal()">Save Breakdown</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Day-level Product PNL Modal -->
+  <div id="day-pnl-modal" class="modal-overlay">
+    <div class="dpnl-sheet">
+
+      <!-- Header -->
+      <div class="dpnl-header">
+        <div class="dpnl-header-left">
+          <div class="dpnl-eyebrow">
+            <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="#fbbf24"/></svg>
+            Product P&amp;L Breakdown
+          </div>
+          <h2>PNL of Products</h2>
+          <div class="dpnl-date" id="dpnl-date-label">—</div>
+        </div>
+        <button class="dpnl-close-btn" onclick="document.getElementById('day-pnl-modal').classList.remove('active')">&times;</button>
+      </div>
+
+      <!-- Summary bar -->
+      <div class="dpnl-summary-bar" id="dpnl-summary-bar">
+        <!-- Rendered by JS -->
+      </div>
+
+      <!-- Table -->
+      <div class="dpnl-table-wrap">
+        <table class="dpnl-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>CP</th>
+              <th>Shipping</th>
+              <th>Ad Spend</th>
+              <th>CPP</th>
+              <th>Revenue</th>
+              <th>PNL</th>
+            </tr>
+          </thead>
+          <tbody id="dpnl-tbody"><!-- Rendered by JS --></tbody>
+          <tfoot id="dpnl-tfoot"><!-- Rendered by JS --></tfoot>
+        </table>
+      </div>
+
     </div>
   </div>
 
@@ -3563,6 +3708,12 @@
             ${(dateStr >= PREPAID_LAUNCH_DATE) ? `<div class="metric-card clickable glow-indigo" onclick="handleCardFilter('${dateStr}','prepaid',this)"><div class="metric-label">Prepaid Orders</div><div class="metric-value" style="color:#818cf8">${paymentCounts.prepaid}</div></div>` : ''}
             ${(dateStr >= PREPAID_LAUNCH_DATE) ? `<div class="metric-card clickable glow-amber"  onclick="handleCardFilter('${dateStr}','cash',this)"><div class="metric-label">Cash Orders</div><div class="metric-value" style="color:#fb923c">${paymentCounts.cash}</div></div>` : ''}
             <div class="metric-card clickable glow-white" onclick="showPLBreakdown('${encodeURIComponent(JSON.stringify(pl)).replace(/'/g, "%27")}')"><div class="metric-label">Net Profit</div><div class="metric-value ${pl.profit >= 0 ? 'text-profit' : 'text-loss'}">${fmtK(pl.profit)}</div></div>
+            <div class="metric-card clickable glow-yellow" onclick="openDayProductPNL('${dateStr}','${prettyDate}')" style="position:relative; overflow:hidden;">
+              <div style="position:absolute; top:8px; right:8px; width:6px; height:6px; border-radius:50%; background:#fbbf24; box-shadow: 0 0 8px #fbbf24; animation: pulseText 2s infinite;"></div>
+              <div class="metric-label">PNL of Products</div>
+              <div class="metric-value" style="color:#fbbf24; font-size:20px;">📊</div>
+              <div style="font-size:10px; color:var(--text-muted); margin-top:6px; opacity:0.7;">Click for breakdown</div>
+            </div>
           </div>
 
           <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;" onclick="document.getElementById('orders-${dateStr}').style.display = document.getElementById('orders-${dateStr}').style.display === 'none' ? 'block' : 'none'">
@@ -3603,6 +3754,132 @@
         feedContainer.innerHTML = '<div class="empty-state">No days selected or invalid date range.</div>';
       }
     }
+
+    // ── Day-level Product PNL Modal ──────────────────────────────────────────
+    window.openDayProductPNL = function(dateStr, prettyDate) {
+      // All line items for this day
+      const dayOrders = window._dayOrdersCache[dateStr] || [];
+
+      // Build per-product stats: qty ordered, and revenue from delivered/prepaid orders only
+      const productMap = {};
+      dayOrders.forEach(o => {
+        const isCountedForRev = isOrderDelivered(o) || isOrderPrepaidRevenue(o);
+        (o.line_items || []).forEach(li => {
+          const key = li.title || 'Unknown';
+          if (!productMap[key]) {
+            const lookupKey = li.sku || ('TITLE:' + li.title);
+            const pricing = state.productPricing[lookupKey] || state.productPricing['TITLE:' + li.title] || null;
+            productMap[key] = {
+              title: key,
+              sku: li.sku || '',
+              lookupKey,
+              qty: 0,
+              revenue: 0,
+              cpPerUnit:       pricing ? (pricing.cp  || PRODUCT_COST)  : PRODUCT_COST,
+              shippingPerUnit: pricing ? (pricing.shipping || SHIPPING_COST) : SHIPPING_COST,
+            };
+          }
+          productMap[key].qty += parseInt(li.quantity || 1);
+          if (isCountedForRev) {
+            productMap[key].revenue += parseFloat(li.price || 0) * parseInt(li.quantity || 1);
+          }
+        });
+      });
+
+      // Pull per-product ad spend for this day from localStorage
+      const dailyProductAdCosts = JSON.parse(localStorage.getItem('dailyProductAdCosts') || '{}');
+      const dayAdSplits = dailyProductAdCosts[dateStr] || {};
+      const totalDayAd = state.adCosts[dateStr] || 0;
+
+      const products = Object.values(productMap);
+      if (products.length === 0) {
+        document.getElementById('dpnl-tbody').innerHTML = `<tr><td colspan="7" class="dpnl-empty">No product data for this day.</td></tr>`;
+        document.getElementById('dpnl-tfoot').innerHTML = '';
+        document.getElementById('dpnl-summary-bar').innerHTML = '';
+        document.getElementById('dpnl-date-label').textContent = prettyDate || dateStr;
+        document.getElementById('day-pnl-modal').classList.add('active');
+        return;
+      }
+
+      let totRev = 0, totCP = 0, totShip = 0, totAd = 0, totPNL = 0;
+
+      const rows = products.map(p => {
+        const cp       = p.cpPerUnit * p.qty;
+        const shipping = p.shippingPerUnit * p.qty;
+        const adSpend  = dayAdSplits[p.title] || 0;
+        const cpp      = p.qty > 0 ? (adSpend / p.qty) : 0;
+        const pnl      = p.revenue - cp - shipping - adSpend;
+
+        totRev  += p.revenue;
+        totCP   += cp;
+        totShip += shipping;
+        totAd   += adSpend;
+        totPNL  += pnl;
+
+        const pnlColor  = pnl >= 0 ? '#34d399' : '#f87171';
+        const pnlPrefix = pnl >= 0 ? '+' : '';
+
+        return `
+          <tr>
+            <td>
+              <span class="dpnl-product-name">${p.title}</span>
+              <span class="dpnl-product-qty">${p.qty}×</span>
+              ${p.sku ? `<div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${p.sku}</div>` : ''}
+            </td>
+            <td style="color:#f87171;">₹${Math.round(cp).toLocaleString('en-IN')}
+              <div style="font-size:10px; color:var(--text-muted);">₹${Math.round(p.cpPerUnit).toLocaleString('en-IN')}/u</div>
+            </td>
+            <td style="color:#60a5fa;">₹${Math.round(shipping).toLocaleString('en-IN')}
+              <div style="font-size:10px; color:var(--text-muted);">₹${Math.round(p.shippingPerUnit).toLocaleString('en-IN')}/u</div>
+            </td>
+            <td style="color:#a78bfa;">${adSpend > 0 ? '₹'+Math.round(adSpend).toLocaleString('en-IN') : '<span style="opacity:0.35;">—</span>'}</td>
+            <td style="color:#a78bfa;">${cpp > 0 ? '₹'+Math.round(cpp).toLocaleString('en-IN') : '<span style="opacity:0.35;">—</span>'}</td>
+            <td style="color:#34d399;">${p.revenue > 0 ? '₹'+Math.round(p.revenue).toLocaleString('en-IN') : '<span style="opacity:0.35;">—</span>'}</td>
+            <td style="color:${pnlColor}; font-weight:700;">${pnlPrefix}₹${Math.round(Math.abs(pnl)).toLocaleString('en-IN')}</td>
+          </tr>`;
+      }).join('');
+
+      // Unallocated ad spend (total day ad minus sum of per-product allocations)
+      const allocatedAd = Object.values(dayAdSplits).reduce((a,b) => a+b, 0);
+      const unallocatedAd = totalDayAd - allocatedAd;
+
+      // Totals footer
+      const totPNLColor  = totPNL >= 0 ? '#34d399' : '#f87171';
+      const totPNLPrefix = totPNL >= 0 ? '+' : '';
+      const footerRow = `
+        <tr class="dpnl-total-row">
+          <td>TOTAL</td>
+          <td style="color:#f87171;">₹${Math.round(totCP).toLocaleString('en-IN')}</td>
+          <td style="color:#60a5fa;">₹${Math.round(totShip).toLocaleString('en-IN')}</td>
+          <td style="color:#a78bfa;">₹${Math.round(totAd).toLocaleString('en-IN')}</td>
+          <td>—</td>
+          <td style="color:#34d399;">₹${Math.round(totRev).toLocaleString('en-IN')}</td>
+          <td style="color:${totPNLColor}; font-size:16px;">${totPNLPrefix}₹${Math.round(Math.abs(totPNL)).toLocaleString('en-IN')}</td>
+        </tr>`;
+
+      // Summary pills
+      const summaryItems = [
+        { label: 'Products', val: products.length, color: '#fbbf24' },
+        { label: 'Revenue', val: '₹'+Math.round(totRev).toLocaleString('en-IN'), color: '#34d399' },
+        { label: 'Total Cost', val: '₹'+Math.round(totCP+totShip+totAd).toLocaleString('en-IN'), color: '#f87171' },
+        { label: 'Net PNL', val: (totPNL>=0?'+':'')+'₹'+Math.round(Math.abs(totPNL)).toLocaleString('en-IN'), color: totPNL>=0?'#34d399':'#f87171' },
+      ];
+      if (unallocatedAd > 0.5) {
+        summaryItems.push({ label: 'Unallocated Ad', val: '₹'+Math.round(unallocatedAd).toLocaleString('en-IN'), color: '#f59e0b' });
+      }
+
+      document.getElementById('dpnl-summary-bar').innerHTML = summaryItems.map(s =>
+        `<div class="dpnl-summary-item">
+          <div class="dpnl-summary-label">${s.label}</div>
+          <div class="dpnl-summary-val" style="color:${s.color}">${s.val}</div>
+        </div>`
+      ).join('');
+
+      document.getElementById('dpnl-tbody').innerHTML = rows;
+      document.getElementById('dpnl-tfoot').innerHTML = footerRow;
+      document.getElementById('dpnl-date-label').textContent = prettyDate || dateStr;
+      document.getElementById('day-pnl-modal').classList.add('active');
+    };
 
     // RENDERING: WEEKLY
     function renderWeekly(wStart, wEnd) {
