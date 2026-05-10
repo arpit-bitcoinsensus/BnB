@@ -315,146 +315,6 @@
       .tags-grid { grid-template-columns: 1fr; }
       .header-controls button { width: 100%; }
     }
-
-    /* ── Per-Product PNL Modal ───────────────────────────── */
-    #product-pnl-modal .modal {
-      max-width: 540px;
-      padding: 0;
-      border-radius: 20px;
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.08);
-      background: #0d0d0d;
-    }
-    .pnl-modal-header {
-      background: linear-gradient(135deg, rgba(251,191,36,0.12) 0%, rgba(217,119,6,0.08) 100%);
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      padding: 28px 32px 24px;
-      position: relative;
-    }
-    .pnl-modal-header .pnl-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.3);
-      color: #fbbf24; font-size: 10px; font-weight: 800;
-      text-transform: uppercase; letter-spacing: 1.5px;
-      padding: 4px 10px; border-radius: 20px; margin-bottom: 12px;
-    }
-    .pnl-modal-header h2 {
-      margin: 0 0 4px; font-family: 'Outfit', sans-serif;
-      font-size: 22px; font-weight: 700; color: #fff;
-      line-height: 1.2;
-    }
-    .pnl-modal-header .pnl-subtitle {
-      font-size: 13px; color: var(--text-muted);
-    }
-    .pnl-modal-close {
-      position: absolute; top: 20px; right: 20px;
-      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
-      color: #a1a1aa; width: 32px; height: 32px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; font-size: 16px; transition: all 0.2s;
-    }
-    .pnl-modal-close:hover { background: rgba(255,255,255,0.12); color: #fff; }
-
-    .pnl-waterfall { padding: 28px 32px; display: flex; flex-direction: column; gap: 0; }
-
-    /* Revenue row */
-    .pnl-row {
-      display: flex; align-items: center;
-      padding: 14px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      animation: fadeInUp 0.4s ease both;
-    }
-    .pnl-row:last-child { border-bottom: none; }
-    .pnl-row-icon {
-      width: 36px; height: 36px; border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px; margin-right: 14px; flex-shrink: 0;
-    }
-    .pnl-row-info { flex: 1; }
-    .pnl-row-label {
-      font-size: 13px; font-weight: 600; color: var(--text-main);
-      margin-bottom: 2px;
-    }
-    .pnl-row-sublabel { font-size: 11px; color: var(--text-muted); }
-    .pnl-row-amount {
-      font-family: 'Outfit', sans-serif;
-      font-size: 17px; font-weight: 700;
-      letter-spacing: -0.3px; text-align: right;
-    }
-    .pnl-row-bar-wrap {
-      width: 100%; height: 3px; background: rgba(255,255,255,0.06);
-      border-radius: 2px; margin-top: 8px; overflow: hidden;
-    }
-    .pnl-row-bar {
-      height: 100%; border-radius: 2px;
-      transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
-    }
-
-    /* Divider line with operator */
-    .pnl-operator {
-      text-align: center; font-size: 20px; color: rgba(255,255,255,0.2);
-      padding: 2px 0; margin: 0 auto;
-      width: 36px; flex-shrink: 0;
-    }
-
-    /* Result row */
-    .pnl-result {
-      margin-top: 8px;
-      padding: 20px 32px;
-      background: linear-gradient(135deg, rgba(0,0,0,0.4), rgba(255,255,255,0.02));
-      border-top: 1px solid rgba(255,255,255,0.08);
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .pnl-result-label {
-      font-size: 13px; color: var(--text-muted);
-      text-transform: uppercase; letter-spacing: 1px; font-weight: 700;
-    }
-    .pnl-result-amount {
-      font-family: 'Outfit', sans-serif;
-      font-size: 32px; font-weight: 800; letter-spacing: -0.5px;
-    }
-    .pnl-result-margin {
-      font-size: 12px; margin-top: 2px; text-align: right;
-    }
-
-    /* Stat pills */
-    .pnl-stats-row {
-      padding: 16px 32px 28px;
-      display: flex; gap: 10px; flex-wrap: wrap;
-    }
-    .pnl-stat-pill {
-      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 8px; padding: 8px 14px;
-      font-size: 12px; flex: 1; min-width: 100px;
-    }
-    .pnl-stat-pill-label { color: var(--text-muted); margin-bottom: 2px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .pnl-stat-pill-val { font-weight: 700; font-size: 15px; }
-
-    /* Make products table rows clickable */
-    .sheet-table tr.product-row-clickable {
-      cursor: pointer;
-      transition: background 0.15s ease;
-    }
-    .sheet-table tr.product-row-clickable:hover {
-      background: rgba(251,191,36,0.05);
-    }
-    .pnl-open-hint {
-      display: inline-flex; align-items: center; gap: 4px;
-      font-size: 10px; color: rgba(251,191,36,0.6);
-      border: 1px solid rgba(251,191,36,0.2); border-radius: 4px;
-      padding: 2px 6px; margin-left: 6px; vertical-align: middle;
-      transition: all 0.2s;
-    }
-    tr.product-row-clickable:hover .pnl-open-hint {
-      color: #fbbf24; border-color: rgba(251,191,36,0.5);
-      background: rgba(251,191,36,0.08);
-    }
-
-    @media (max-width: 480px) {
-      #product-pnl-modal .modal { max-width: 100%; border-radius: 16px; }
-      .pnl-modal-header, .pnl-waterfall, .pnl-result, .pnl-stats-row { padding-left: 20px; padding-right: 20px; }
-      .pnl-result-amount { font-size: 26px; }
-    }
   </style>
 </head>
 <body>
@@ -976,44 +836,6 @@
       <div style="text-align: right; margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
         <button onclick="document.getElementById('daily-adspend-modal').classList.remove('active')" style="background:transparent; border:1px solid var(--border); color:white; padding: 8px 16px; border-radius: 6px; font-weight:600; cursor:pointer;">Cancel</button>
         <button class="primary" onclick="saveDailyAdSpendModal()">Save Breakdown</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Per-Product PNL Breakdown Modal -->
-  <div id="product-pnl-modal" class="modal-overlay">
-    <div class="modal">
-      <!-- Header -->
-      <div class="pnl-modal-header">
-        <button class="pnl-modal-close" onclick="document.getElementById('product-pnl-modal').classList.remove('active')">&times;</button>
-        <div class="pnl-badge">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="4"/></svg>
-          Product P&amp;L Analysis
-        </div>
-        <h2 id="pnl-product-title">Product Name</h2>
-        <div class="pnl-subtitle" id="pnl-product-subtitle">Units sold • Date range</div>
-      </div>
-
-      <!-- Waterfall Breakdown -->
-      <div class="pnl-waterfall" id="pnl-waterfall-rows">
-        <!-- Rendered by JS -->
-      </div>
-
-      <!-- Net Result -->
-      <div class="pnl-result">
-        <div>
-          <div class="pnl-result-label">Net Profit / Loss</div>
-          <div id="pnl-result-tag" style="margin-top:6px;"></div>
-        </div>
-        <div style="text-align:right;">
-          <div class="pnl-result-amount" id="pnl-net-amount">₹0</div>
-          <div class="pnl-result-margin" id="pnl-net-margin"></div>
-        </div>
-      </div>
-
-      <!-- Quick Stats Pills -->
-      <div class="pnl-stats-row" id="pnl-stats-row">
-        <!-- Rendered by JS -->
       </div>
     </div>
   </div>
@@ -3106,166 +2928,37 @@
         renderProducts(document.getElementById('products-start-date').value, document.getElementById('products-end-date').value);
       };
 
-      // Store product data for PNL modal access
-      window._productPNLData = {};
-
       tbody.innerHTML = sorted.map(([title, s]) => {
         const sku = skuMap[title] || '';
-        const pricing = state.productPricing[sku] || state.productPricing['TITLE:' + title] || { cp: PRODUCT_COST, shipping: SHIPPING_COST };
-        const productCostTotal = s.sold * (pricing.cp || PRODUCT_COST);
-        const shippingCostTotal = s.sold * (pricing.shipping || SHIPPING_COST);
+        const pricing = state.productPricing[sku] || { cp: PRODUCT_COST, shipping: SHIPPING_COST };
+        const cost = s.sold * (pricing.cp + pricing.shipping);
         
         // Use Meta spend if > 0, else fallback to range aggregate, then global manual input
         const adSpend = s.metaSpend > 0 ? s.metaSpend : (rangeSpends[title] || manualSpends[title] || 0);
         const cpp = s.sold > 0 ? (adSpend / s.sold) : 0;
-        const profit = s.revenue - productCostTotal - shippingCostTotal - adSpend;
-
-        // Cache PNL data for the modal
-        window._productPNLData[title] = {
-          title, sku,
-          sold: s.sold,
-          revenue: s.revenue,
-          productCost: productCostTotal,
-          shippingCost: shippingCostTotal,
-          adSpend,
-          cpp,
-          profit,
-          cpPerUnit: pricing.cp || PRODUCT_COST,
-          shippingPerUnit: pricing.shipping || SHIPPING_COST,
-          dateRange: `${document.getElementById('products-start-date').value} → ${document.getElementById('products-end-date').value}`
-        };
+        const profit = s.revenue - cost - adSpend;
         
-        const profitClass = profit >= 0 ? 'text-profit' : 'text-loss';
-        const safeTitle = title.replace(/"/g,'&quot;').replace(/'/g,'&#39;');
         return `
-          <tr class="product-row-clickable" onclick="openProductPNL('${safeTitle}')">
-            <td>
-              <div style="display:flex; align-items:center; gap:6px;">
-                <span>${title}</span>
-                <span class="pnl-open-hint">📊 P&amp;L</span>
-              </div>
-              <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${sku}</div>
-            </td>
+          <tr>
+            <td>${title} <div style="font-size:10px; color:var(--text-muted)">${sku}</div></td>
             <td style="font-weight:600;">${s.sold}</td>
             <td>${fmt(s.revenue)}</td>
-            <td class="text-loss">${fmt(productCostTotal + shippingCostTotal)}</td>
+            <td class="text-loss">${fmt(cost)}</td>
             <td>
               <div style="display:flex; align-items:center; gap:4px;">
                 <span style="color:var(--text-muted)">₹</span>
                 <input type="number" value="${adSpend}" 
-                       onclick="event.stopPropagation()"
                        onchange="updateProductAdSpend('${title.replace(/'/g, "\\'")}', this.value)"
                        ${s.metaSpend > 0 ? 'disabled title="Fetched from Meta Ads"' : ''}
                        style="width: 80px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: white; padding: 6px 8px; border-radius: 4px; font-size: 13px; outline: none; ${s.metaSpend > 0 ? 'opacity: 0.7;' : ''}">
               </div>
             </td>
-            <td><span style="background: rgba(167, 139, 250, 0.15); color: #a78bfa; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; border: 1px solid rgba(167, 139, 250, 0.3);">₹${Math.round(cpp).toLocaleString('en-IN')}</span></td>
-            <td class="${profitClass}" style="font-weight:700;">${fmt(profit)}</td>
+            <td><span style="background: rgba(167, 139, 250, 0.15); color: #a78bfa; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; border: 1px solid rgba(167, 139, 250, 0.3);">₹${fmt(cpp)}</span></td>
+            <td class="${profit >= 0 ? 'text-profit' : 'text-loss'}" style="font-weight:700;">${fmt(profit)}</td>
           </tr>
         `;
       }).join('');
     }
-
-    // ── Per-Product PNL Modal ─────────────────────────────────────────────
-    window.openProductPNL = function(title) {
-      const d = window._productPNLData?.[title];
-      if (!d) return;
-
-      // Header
-      document.getElementById('pnl-product-title').textContent = d.title;
-      document.getElementById('pnl-product-subtitle').textContent =
-        `${d.sold} unit${d.sold !== 1 ? 's' : ''} sold  •  ${d.dateRange}`;
-
-      // Waterfall rows config
-      const revenue = d.revenue;
-      const rows = [
-        {
-          icon: '💰', iconBg: 'rgba(52,211,153,0.12)',
-          label: 'Gross Revenue', sublabel: `${d.sold} orders × avg selling price`,
-          amount: revenue, amtColor: '#34d399',
-          barColor: '#34d399', barPct: 100,
-          prefix: '+'
-        },
-        {
-          icon: '📦', iconBg: 'rgba(248,113,113,0.12)',
-          label: 'Product Cost (COGS)', sublabel: `₹${Math.round(d.cpPerUnit).toLocaleString('en-IN')} × ${d.sold} units`,
-          amount: d.productCost, amtColor: '#f87171',
-          barColor: '#f87171', barPct: revenue > 0 ? Math.min(100,(d.productCost/revenue)*100) : 0,
-          prefix: '−'
-        },
-        {
-          icon: '🚚', iconBg: 'rgba(96,165,250,0.12)',
-          label: 'Shipping / Fulfillment', sublabel: `₹${Math.round(d.shippingPerUnit).toLocaleString('en-IN')} × ${d.sold} units`,
-          amount: d.shippingCost, amtColor: '#60a5fa',
-          barColor: '#60a5fa', barPct: revenue > 0 ? Math.min(100,(d.shippingCost/revenue)*100) : 0,
-          prefix: '−'
-        },
-        {
-          icon: '📣', iconBg: 'rgba(167,139,250,0.12)',
-          label: 'Ad Spend', sublabel: d.adSpend > 0 ? `CPP ₹${Math.round(d.cpp).toLocaleString('en-IN')} per unit` : 'No ad spend recorded',
-          amount: d.adSpend, amtColor: '#a78bfa',
-          barColor: '#a78bfa', barPct: revenue > 0 ? Math.min(100,(d.adSpend/revenue)*100) : 0,
-          prefix: '−'
-        }
-      ];
-
-      const waterfallEl = document.getElementById('pnl-waterfall-rows');
-      waterfallEl.innerHTML = rows.map((r, i) => `
-        <div class="pnl-row" style="animation-delay:${i * 0.07}s">
-          <div class="pnl-row-icon" style="background:${r.iconBg}">${r.icon}</div>
-          <div class="pnl-row-info">
-            <div class="pnl-row-label">${r.label}</div>
-            <div class="pnl-row-sublabel">${r.sublabel}</div>
-            <div class="pnl-row-bar-wrap">
-              <div class="pnl-row-bar" style="background:${r.barColor}; width:0%" data-pct="${r.barPct.toFixed(1)}"></div>
-            </div>
-          </div>
-          <div class="pnl-row-amount" style="color:${r.amtColor}; margin-left:20px;">${r.prefix}₹${Math.round(r.amount).toLocaleString('en-IN')}</div>
-        </div>
-      `).join('');
-
-      // Animate bars after DOM insert
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          document.querySelectorAll('#pnl-waterfall-rows .pnl-row-bar').forEach(bar => {
-            bar.style.width = bar.dataset.pct + '%';
-          });
-        });
-      });
-
-      // Net result
-      const profit = d.profit;
-      const isProfit = profit >= 0;
-      const margin = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : 0;
-      const netEl = document.getElementById('pnl-net-amount');
-      netEl.textContent = (isProfit ? '+' : '−') + '₹' + Math.abs(Math.round(profit)).toLocaleString('en-IN');
-      netEl.style.color = isProfit ? '#34d399' : '#f87171';
-      netEl.style.textShadow = isProfit ? '0 0 24px rgba(52,211,153,0.4)' : '0 0 24px rgba(248,113,113,0.4)';
-
-      document.getElementById('pnl-net-margin').innerHTML =
-        `<span style="color:${isProfit ? '#34d399' : '#f87171'}; font-size:12px; font-weight:600;">${isProfit ? '▲' : '▼'} ${Math.abs(margin)}% profit margin</span>`;
-
-      document.getElementById('pnl-result-tag').innerHTML = isProfit
-        ? `<span style="background:rgba(52,211,153,0.12); color:#34d399; border:1px solid rgba(52,211,153,0.3); font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:1px; padding:3px 10px; border-radius:20px;">✓ Profitable</span>`
-        : `<span style="background:rgba(248,113,113,0.12); color:#f87171; border:1px solid rgba(248,113,113,0.3); font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:1px; padding:3px 10px; border-radius:20px;">✗ Loss-Making</span>`;
-
-      // Quick stat pills
-      const totalCost = d.productCost + d.shippingCost + d.adSpend;
-      const pills = [
-        { label: 'Revenue / Unit', val: revenue > 0 && d.sold > 0 ? '₹' + Math.round(revenue/d.sold).toLocaleString('en-IN') : '—' },
-        { label: 'Total Cost', val: '₹' + Math.round(totalCost).toLocaleString('en-IN') },
-        { label: 'Profit / Unit', val: (d.sold > 0 ? ((isProfit?'+':'−')+'₹'+Math.abs(Math.round(profit/d.sold)).toLocaleString('en-IN')) : '—'), color: isProfit ? '#34d399' : '#f87171' },
-        { label: 'Ad / Revenue', val: revenue > 0 ? (d.adSpend/revenue*100).toFixed(1)+'%' : '0%', color: (d.adSpend/revenue*100) > 30 ? '#f87171' : '#34d399' }
-      ];
-      document.getElementById('pnl-stats-row').innerHTML = pills.map(p =>
-        `<div class="pnl-stat-pill">
-          <div class="pnl-stat-pill-label">${p.label}</div>
-          <div class="pnl-stat-pill-val" style="color:${p.color || 'var(--text-main)'}">${p.val}</div>
-        </div>`
-      ).join('');
-
-      document.getElementById('product-pnl-modal').classList.add('active');
-    };
 
     // Meta Ads Modal Logic
     document.getElementById('btn-connect-meta')?.addEventListener('click', () => {
