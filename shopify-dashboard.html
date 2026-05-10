@@ -3760,6 +3760,29 @@
       // All line items for this day
       const dayOrders = window._dayOrdersCache[dateStr] || [];
 
+      // Helper: resolve pricing for a line item using a 4-step cascade
+      // 1) Direct SKU key  2) TITLE: key  3) Scan all pricing by title match  4) Global defaults
+      function resolvePricing(li) {
+        const pp = state.productPricing;
+        // Step 1: direct SKU
+        if (li.sku && pp[li.sku]) return pp[li.sku];
+        // Step 2: TITLE: key
+        const titleKey = 'TITLE:' + li.title;
+        if (pp[titleKey]) return pp[titleKey];
+        // Step 3: scan all entries for a title that matches (case-insensitive substring)
+        const liTitle = (li.title || '').toLowerCase();
+        const allEntries = Object.values(pp);
+        const byTitle = allEntries.find(e => e.title && e.title.toLowerCase() === liTitle);
+        if (byTitle) return byTitle;
+        // Step 3b: partial title match (product title contains line item title or vice versa)
+        const partial = allEntries.find(e => e.title && (
+          e.title.toLowerCase().includes(liTitle) || liTitle.includes(e.title.toLowerCase())
+        ));
+        if (partial) return partial;
+        // Step 4: fallback
+        return null;
+      }
+
       // Build per-product stats: qty ordered, and revenue from delivered/prepaid orders only
       const productMap = {};
       dayOrders.forEach(o => {
@@ -3767,16 +3790,15 @@
         (o.line_items || []).forEach(li => {
           const key = li.title || 'Unknown';
           if (!productMap[key]) {
-            const lookupKey = li.sku || ('TITLE:' + li.title);
-            const pricing = state.productPricing[lookupKey] || state.productPricing['TITLE:' + li.title] || null;
+            const pricing = resolvePricing(li);
             productMap[key] = {
               title: key,
               sku: li.sku || '',
-              lookupKey,
+              pricingFound: !!pricing,
               qty: 0,
               revenue: 0,
-              cpPerUnit:       pricing ? (pricing.cp  || PRODUCT_COST)  : PRODUCT_COST,
-              shippingPerUnit: pricing ? (pricing.shipping || SHIPPING_COST) : SHIPPING_COST,
+              cpPerUnit:       pricing ? (pricing.cp       ?? PRODUCT_COST)  : PRODUCT_COST,
+              shippingPerUnit: pricing ? (pricing.shipping ?? SHIPPING_COST) : SHIPPING_COST,
             };
           }
           productMap[key].qty += parseInt(li.quantity || 1);
@@ -3824,7 +3846,12 @@
             <td>
               <span class="dpnl-product-name">${p.title}</span>
               <span class="dpnl-product-qty">${p.qty}×</span>
-              ${p.sku ? `<div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${p.sku}</div>` : ''}
+              <div style="margin-top:3px; display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+                ${p.sku ? `<span style="font-size:10px; color:var(--text-muted);">${p.sku}</span>` : ''}
+                <span style="font-size:9px; font-weight:700; padding:1px 6px; border-radius:4px; ${p.pricingFound ? 'background:rgba(52,211,153,0.12); color:#34d399; border:1px solid rgba(52,211,153,0.25);' : 'background:rgba(255,255,255,0.05); color:var(--text-muted); border:1px solid rgba(255,255,255,0.1);'}">
+                  ${p.pricingFound ? '✓ Pricing synced' : '⚠ Default'}
+                </span>
+              </div>
             </td>
             <td style="color:#f87171;">₹${Math.round(cp).toLocaleString('en-IN')}
               <div style="font-size:10px; color:var(--text-muted);">₹${Math.round(p.cpPerUnit).toLocaleString('en-IN')}/u</div>
