@@ -1,12 +1,32 @@
-proxy.log
-node_modules/
-.DS_Store
+# Secrets — NEVER commit these
+.env
 **/.env
+
+# Dependencies
+node_modules/
+
+# Vercel
 .vercel
+
+# Logs & temp files
+proxy.log
+*.log
+
+# macOS
+.DS_Store
+
+# Data exports
 *.csv
+
+# One-off Python scripts
 compare_*.py
 generate_report.py
 find_extra_delivered.py
 final_alignment.py
 apply_fixes.py
 db_fixes.sql
+
+# Remote backups / dev artifacts
+*.remote
+test.js
+BnB-fresh/
