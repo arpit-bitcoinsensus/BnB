@@ -2970,6 +2970,7 @@
             <td>
               <div style="display:flex;gap:6px;">
                 <button class="expand-btn" onclick="saveSKUPricing('${encSku}')" ${isHidden?'disabled':''}>Save</button>
+                <button class="expand-btn" onclick="addCustomVariant('${encTitle}')" ${isHidden?'disabled':''}>+ Add Pack</button>
                 <button class="expand-btn" onclick="toggleHideGroup('${encTitle}')" style="color:var(--text-muted);">${isHidden?'Unhide':'Hide'}</button>
               </div>
             </td>`;
@@ -2991,6 +2992,7 @@
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;">
                   ${statusHtml}
+                  <button class="expand-btn" onclick="addCustomVariant('${encTitle}')" style="font-size:11px;" ${isGroupHidden?'disabled':''}>+ Add Pack</button>
                   <button class="expand-btn" onclick="toggleHideGroup('${encTitle}')" style="color:var(--text-muted);font-size:11px;">${isGroupHidden?'Unhide All':'Hide All'}</button>
                 </div>
               </div>
@@ -3077,6 +3079,39 @@
       } finally {
         hideLoading();
       }
+    };
+
+    window.addCustomVariant = function(encodedTitle) {
+      const title = decodeURIComponent(encodedTitle);
+      const variantName = prompt(`Enter new pack/variant name for "${title}" (e.g. 'Pack of 2'):`);
+      if (!variantName || !variantName.trim()) return;
+      
+      const newSku = 'TITLE:' + title + ' — ' + variantName.trim();
+      if (state.productPricing[newSku]) {
+          alert("This variant already exists!");
+          return;
+      }
+      
+      let baseCp = 555;
+      let baseShipping = 135;
+      const existing = Object.keys(state.productPricing).find(s => state.productPricing[s].title === title);
+      if (existing) {
+          baseCp = state.productPricing[existing].cp;
+          baseShipping = state.productPricing[existing].shipping;
+      }
+      
+      state.productPricing[newSku] = {
+          cp: baseCp, sp: 0, shipping: baseShipping,
+          title: title, variantTitle: variantName.trim()
+      };
+      
+      renderPricing();
+      
+      // Auto-save the newly created variant row immediately so it persists
+      const encNewSku = encodeURIComponent(newSku).replace(/'/g, "%27");
+      setTimeout(() => {
+        saveSKUPricing(encNewSku);
+      }, 500);
     };
 
     // Helper: flush ALL pricing input values currently in DOM into state.productPricing
@@ -3871,6 +3906,9 @@
             let qty = parseInt(li.quantity || 1);
             totalItemsCount += qty;
             let name = li.title || 'Unknown Item';
+            if (li.variant_title && li.variant_title !== 'Default Title') {
+               name += ' — ' + li.variant_title;
+            }
             itemBreakdownMap[name] = (itemBreakdownMap[name] || 0) + qty;
           });
         });
@@ -4291,6 +4329,9 @@
         let qty = parseInt(li.quantity || 1);
         weeklyTotalItems += qty;
         let name = li.title || 'Unknown Item';
+        if (li.variant_title && li.variant_title !== 'Default Title') {
+           name += ' — ' + li.variant_title;
+        }
         weeklyItemBreakdownMap[name] = (weeklyItemBreakdownMap[name] || 0) + qty;
       });
 
@@ -4409,6 +4450,9 @@
         let qty = parseInt(li.quantity || 1);
         monthlyTotalItems += qty;
         let name = li.title || 'Unknown Item';
+        if (li.variant_title && li.variant_title !== 'Default Title') {
+           name += ' — ' + li.variant_title;
+        }
         monthlyItemBreakdownMap[name] = (monthlyItemBreakdownMap[name] || 0) + qty;
       });
       let totalNotConfirmed = 0;
@@ -4564,6 +4608,9 @@
         let qty = parseInt(li.quantity || 1);
         allTimeTotalItems += qty;
         let name = li.title || 'Unknown Item';
+        if (li.variant_title && li.variant_title !== 'Default Title') {
+           name += ' — ' + li.variant_title;
+        }
         allTimeItemBreakdownMap[name] = (allTimeItemBreakdownMap[name] || 0) + qty;
       });
 
