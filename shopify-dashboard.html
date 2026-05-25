@@ -2034,15 +2034,28 @@
       if (!pp || Object.keys(pp).length === 0) return null;
       // Step 1: direct SKU key
       if (li.sku && pp[li.sku]) return pp[li.sku];
-      // Step 2: TITLE: key
+      
+      // Step 2: Composite TITLE + Variant key (for variants without SKUs)
+      let vTitle = li.variant_title;
+      if (vTitle && vTitle !== 'Default Title') {
+        const compositeKey = 'TITLE:' + li.title + ' — ' + vTitle;
+        if (pp[compositeKey]) return pp[compositeKey];
+      }
+      
+      // Step 3: pure TITLE: key (fallback)
       const titleKey = 'TITLE:' + li.title;
       if (pp[titleKey]) return pp[titleKey];
-      // Step 3: exact title match (case-insensitive)
+      
+      // Step 4: exact title match (case-insensitive)
       const liTitle = (li.title || '').toLowerCase().trim();
       if (!liTitle) return null;
       const allEntries = Object.values(pp);
-      const exact = allEntries.find(e => e.title && e.title.toLowerCase().trim() === liTitle);
+      const exact = allEntries.find(e => e.title && e.title.toLowerCase().trim() === liTitle && (!vTitle || vTitle === 'Default Title' || e.variantTitle === vTitle));
       if (exact) return exact;
+      
+      // Step 5: legacy exact title match ignoring variant
+      const exactLegacy = allEntries.find(e => e.title && e.title.toLowerCase().trim() === liTitle);
+      if (exactLegacy) return exactLegacy;
       // Step 4: partial title match (one contains the other)
       const partial = allEntries.find(e => e.title && (
         e.title.toLowerCase().trim().includes(liTitle) || liTitle.includes(e.title.toLowerCase().trim())
@@ -2068,7 +2081,14 @@
           const shipping = (resolved && typeof resolved.shipping === 'number') ? resolved.shipping : SHIPPING_COST;
           const isDelivered = item.isDelivered;
           const isFulfilled = item.isFulfilled;
-          const itemKey = item.sku || ('TITLE:' + item.title);
+          
+          let itemKey = item.sku;
+          if (!itemKey) {
+             itemKey = 'TITLE:' + item.title;
+             if (item.variant_title && item.variant_title !== 'Default Title') {
+                itemKey += ' — ' + item.variant_title;
+             }
+          }
 
           if (isDelivered) {
              totalProductCost += (cp * item.quantity);
@@ -3202,11 +3222,42 @@
           console.warn("Could not fetch Shopify products for status sync:", err);
         }
 
-        // 2. Fetch from inventory table
+        // 2. Add all Shopify variants to productPricing (handles variants without SKUs correctly)
+        if (shopifyProducts.length > 0) {
+          const pricingMeta = JSON.parse(localStorage.getItem('pricingMeta') || '{}');
+          shopifyProducts.forEach(p => {
+            const title = p.title;
+            if (!pricingMeta[title]) pricingMeta[title] = {};
+            pricingMeta[title].image = p.image?.src || p.images?.[0]?.src || '';
+            pricingMeta[title].status = p.status;
+            
+            p.variants.forEach(v => {
+              const isDefault = !v.title || v.title === 'Default Title';
+              const sku = v.sku || ('TITLE:' + title + (isDefault ? '' : ' — ' + v.title));
+              
+              if (!state.productPricing[sku]) {
+                state.productPricing[sku] = {
+                  cp: 555, sp: 0, shipping: 135,
+                  title: title,
+                  variantTitle: isDefault ? '' : v.title
+                };
+              }
+              
+              if (p.status === 'active') {
+                window.hiddenPricingSKUs.delete(sku);
+              } else {
+                window.hiddenPricingSKUs.add(sku);
+              }
+            });
+          });
+          localStorage.setItem('pricingMeta', JSON.stringify(pricingMeta));
+        }
+
+        // 3. Fetch from inventory table (legacy)
         const { data: invData, error: invError } = await sbClient.from('inventory').select('sku, title');
         if (invError) throw invError;
 
-        // 3. Fetch unique SKUs from order_items table for products that might not be in inventory
+        // 4. Fetch unique SKUs from order_items table (legacy)
         const { data: orderItemsData, error: oiError } = await sbClient.from('order_items').select('sku, title');
         if (oiError) throw oiError;
 
@@ -3231,34 +3282,6 @@
             }
           }
         });
-
-        // 4. Update hidden status based on Shopify "active" status and store image/status metadata
-        if (shopifyProducts.length > 0) {
-          const pricingMeta = JSON.parse(localStorage.getItem('pricingMeta') || '{}');
-          shopifyProducts.forEach(p => {
-            const title = p.title;
-            if (!pricingMeta[title]) pricingMeta[title] = {};
-            pricingMeta[title].image = p.image?.src || p.images?.[0]?.src || '';
-            pricingMeta[title].status = p.status;
-            
-            p.variants.forEach(v => {
-              const sku = v.sku || ('TITLE:' + p.title);
-              if (p.status === 'active') {
-                window.hiddenPricingSKUs.delete(sku);
-              } else {
-                window.hiddenPricingSKUs.add(sku);
-              }
-            });
-            const titleSku = 'TITLE:' + p.title;
-            if (p.status === 'active') {
-               window.hiddenPricingSKUs.delete(titleSku);
-            } else {
-               window.hiddenPricingSKUs.add(titleSku);
-            }
-          });
-          localStorage.setItem('hiddenPricingSKUs', JSON.stringify([...window.hiddenPricingSKUs]));
-          localStorage.setItem('pricingMeta', JSON.stringify(pricingMeta));
-        }
 
         renderPricing();
         log(`Synced ${Object.keys(state.productPricing).length} total SKUs from inventory and orders.`);
