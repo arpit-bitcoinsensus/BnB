@@ -561,7 +561,7 @@
                 <th>Product</th>
                 <th style="width: 100px;">Status</th>
                 <th style="width: 150px;">Cost Price (CP)</th>
-                <th style="width: 150px;">Selling Price (SP)</th>
+                <th style="width: 170px;">Avg. Sale Price <span style="font-size:9px; opacity:0.5; font-weight:400;">(auto from orders)</span></th>
                 <th style="width: 180px;">Shipping/Fulfillment</th>
                 <th style="width: 100px;">Action</th>
               </tr>
@@ -2826,7 +2826,7 @@
         return;
       }
 
-      const grouped = {};
+       const grouped = {};
       skus.forEach(sku => {
         const p = state.productPricing[sku];
         const title = p.title || 'Unknown Product';
@@ -2835,6 +2835,45 @@
         }
         grouped[title].skus.push(sku);
       });
+
+      // ── Auto-calculate average selling price per product from actual orders ──
+      // Revenue = sum of (line_item.price × qty) for delivered/prepaid orders
+      const orderAvgSP = {}; // title -> { totalRev, totalQty }
+      (state.orders || []).forEach(o => {
+        const isRev = isOrderDelivered(o) || isOrderPrepaidRevenue(o);
+        if (!isRev) return;
+        (o.line_items || []).forEach(li => {
+          const t = (li.title || '').trim();
+          if (!t) return;
+          if (!orderAvgSP[t]) orderAvgSP[t] = { totalRev: 0, totalQty: 0 };
+          orderAvgSP[t].totalRev += parseFloat(li.price || 0) * parseInt(li.quantity || 1);
+          orderAvgSP[t].totalQty += parseInt(li.quantity || 1);
+        });
+      });
+      // Also try partial/exact title match for products whose title slightly differs
+      function findAvgSP(productTitle) {
+        const ptLower = productTitle.toLowerCase().trim();
+        // Exact match first
+        if (orderAvgSP[productTitle]) {
+          const d = orderAvgSP[productTitle];
+          return d.totalQty > 0 ? Math.round(d.totalRev / d.totalQty) : null;
+        }
+        // Case-insensitive exact
+        const exactKey = Object.keys(orderAvgSP).find(k => k.toLowerCase().trim() === ptLower);
+        if (exactKey) {
+          const d = orderAvgSP[exactKey];
+          return d.totalQty > 0 ? Math.round(d.totalRev / d.totalQty) : null;
+        }
+        // Partial match
+        const partialKey = Object.keys(orderAvgSP).find(k =>
+          k.toLowerCase().trim().includes(ptLower) || ptLower.includes(k.toLowerCase().trim())
+        );
+        if (partialKey) {
+          const d = orderAvgSP[partialKey];
+          return d.totalQty > 0 ? Math.round(d.totalRev / d.totalQty) : null;
+        }
+        return null;
+      }
 
       const groupedTitles = Object.keys(grouped).sort();
       const pricingMeta = JSON.parse(localStorage.getItem('pricingMeta') || '{}');
@@ -2868,6 +2907,30 @@
              ? `<img src="${imageUrl}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover; border: 1px solid rgba(255,255,255,0.1);">`
              : `<div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--text-muted);">📦</div>`;
 
+        // Build the auto avg sale price cell
+        const avgSP = findAvgSP(title);
+        let spCellHtml;
+        if (isHidden) {
+          spCellHtml = `<span style="color:var(--text-muted); font-size:13px;">—</span>`;
+        } else if (avgSP !== null) {
+          const totalSold = (orderAvgSP[title] || Object.values(orderAvgSP).find((_, i) => Object.keys(orderAvgSP)[i].toLowerCase().trim() === title.toLowerCase().trim()) || {}).totalQty || '?';
+          const margin = (group.cp + group.shipping) > 0 && avgSP > 0
+            ? Math.round(((avgSP - group.cp - group.shipping) / avgSP) * 100)
+            : null;
+          const marginColor = margin === null ? 'var(--text-muted)' : margin >= 30 ? '#34d399' : margin >= 0 ? '#fbbf24' : '#f87171';
+          const marginHtml = margin !== null
+            ? `<span style="font-size:10px; color:${marginColor}; font-weight:700; margin-left:6px; background:${marginColor}22; padding:2px 6px; border-radius:4px;">${margin >= 0 ? '+' : ''}${margin}%</span>`
+            : '';
+          spCellHtml = `
+            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:2px;">
+              <span style="font-size:15px; font-weight:600; color:white;">₹${avgSP.toLocaleString('en-IN')}</span>
+              ${marginHtml}
+            </div>
+            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">avg · ${totalSold} units sold</div>`;
+        } else {
+          spCellHtml = `<span style="color:var(--text-muted); font-size:12px; font-style:italic;">No sales yet</span>`;
+        }
+
         const row = document.createElement('tr');
         row.style.opacity = rowOpacity;
         row.innerHTML = `
@@ -2882,7 +2945,7 @@
           </td>
           <td data-label="Status">${statusHtml}</td>
           <td data-label="Cost Price (CP)"><input type="number" class="inline-input pricing-input" data-title="${encTitle}" data-field="cp" value="${group.cp}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
-          <td data-label="Selling Price (SP)"><input type="number" class="inline-input pricing-input" data-title="${encTitle}" data-field="sp" value="${group.sp}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
+          <td data-label="Avg. Sale Price">${spCellHtml}</td>
           <td data-label="Shipping/Fulfillment"><input type="number" class="inline-input pricing-input" data-title="${encTitle}" data-field="shipping" value="${group.shipping}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
           <td data-label="Action">
             <div style="display: flex; gap: 6px;">
@@ -2917,6 +2980,7 @@
       document.querySelectorAll('.pricing-input').forEach(input => {
         const title = decodeURIComponent(input.dataset.title);
         const field = input.dataset.field;
+        if (field === 'sp') return; // SP is auto-calculated from orders, not user-editable
         const val = parseFloat(input.value) || 0;
         // Find all SKUs that belong to this product title and update them
         Object.keys(state.productPricing).forEach(sku => {
