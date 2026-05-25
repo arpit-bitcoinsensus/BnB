@@ -2072,9 +2072,13 @@
 
           if (isDelivered) {
              totalProductCost += (cp * item.quantity);
+             // Build display name: product + variant (e.g. "BNB Paper Paint — Pack of 2")
+             const variantSuffix = (item.variant_title && item.variant_title !== 'Default Title')
+               ? ` — ${item.variant_title}` : '';
+             const displayName = (item.title || 'Unknown Product') + variantSuffix;
              if (!itemMap[itemKey]) {
                 itemMap[itemKey] = {
-                  name: item.title || 'Unknown Product',
+                  name: displayName,
                   price: parseFloat(item.price || 0),
                   cp: cp,
                   qty: 0,
@@ -2776,15 +2780,33 @@
             cp: p.cost_price,
             sp: p.selling_price,
             shipping: p.shipping_charge,
-            title: p.product_title
+            title: p.product_title,
+            variantTitle: p.variant_title || ''
           };
         });
+
+        // Enrich variant titles from already-loaded orders (li.variant_title is in Shopify data)
+        enrichVariantTitlesFromOrders();
         renderPricing();
       } catch (e) {
         log("Error fetching pricing: " + e.message);
       } finally {
         hideLoading();
       }
+    }
+
+    // Scan state.orders to pick up variant_title for each SKU
+    function enrichVariantTitlesFromOrders() {
+      (state.orders || []).forEach(o => {
+        (o.line_items || []).forEach(li => {
+          if (!li.sku || !li.variant_title || li.variant_title === 'Default Title') return;
+          if (state.productPricing[li.sku]) {
+            if (!state.productPricing[li.sku].variantTitle) {
+              state.productPricing[li.sku].variantTitle = li.variant_title;
+            }
+          }
+        });
+      });
     }
 
     window.hiddenPricingSKUs = new Set(JSON.parse(localStorage.getItem('hiddenPricingSKUs') || '[]'));
@@ -2806,173 +2828,236 @@
       renderPricing();
     };
 
+
     function renderPricing() {
       const tbody = document.getElementById('pricing-tbody');
       if (!tbody) return;
       tbody.innerHTML = '';
 
       const allSkus = Object.keys(state.productPricing).sort();
-      let skus = window.showHiddenProducts ? allSkus : allSkus.filter(s => !window.hiddenPricingSKUs.has(s));
-      
+      const visibleSkus = window.showHiddenProducts ? allSkus : allSkus.filter(s => !window.hiddenPricingSKUs.has(s));
+
       const toggleBtn = document.getElementById('btn-toggle-hidden');
-      if(toggleBtn) {
-         const hasHidden = window.hiddenPricingSKUs.size > 0;
-         toggleBtn.style.display = hasHidden ? 'inline-block' : 'none';
-         if (!hasHidden) window.showHiddenProducts = false; // Reset if all unhidden
+      if (toggleBtn) {
+        const hasHidden = window.hiddenPricingSKUs.size > 0;
+        toggleBtn.style.display = hasHidden ? 'inline-block' : 'none';
+        if (!hasHidden) window.showHiddenProducts = false;
       }
 
-      if (skus.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted)">No products visible. Add or Sync from inventory.</td></tr>';
+      if (visibleSkus.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">No products visible. Add or Sync from inventory.</td></tr>';
         return;
       }
 
-       const grouped = {};
-      skus.forEach(sku => {
+      // Group by product title
+      const grouped = {};
+      visibleSkus.forEach(sku => {
         const p = state.productPricing[sku];
         const title = p.title || 'Unknown Product';
-        if (!grouped[title]) {
-           grouped[title] = { skus: [], cp: p.cp, sp: p.sp, shipping: p.shipping, title };
-        }
+        if (!grouped[title]) grouped[title] = { skus: [], title };
         grouped[title].skus.push(sku);
       });
 
-      // ── Auto-calculate average selling price per product from actual orders ──
-      // Revenue = sum of (line_item.price × qty) for delivered/prepaid orders
-      const orderAvgSP = {}; // title -> { totalRev, totalQty }
+      // Build per-SKU avg sale price from actual orders
+      const skuRevMap  = {}; // sku   -> { totalRev, totalQty }
+      const nameRevMap = {}; // title -> { totalRev, totalQty }
       (state.orders || []).forEach(o => {
-        const isRev = isOrderDelivered(o) || isOrderPrepaidRevenue(o);
-        if (!isRev) return;
+        if (!isOrderDelivered(o) && !isOrderPrepaidRevenue(o)) return;
         (o.line_items || []).forEach(li => {
+          const price = parseFloat(li.price || 0);
+          const qty   = parseInt(li.quantity || 1);
+          if (li.sku) {
+            if (!skuRevMap[li.sku])  skuRevMap[li.sku]  = { totalRev: 0, totalQty: 0 };
+            skuRevMap[li.sku].totalRev  += price * qty;
+            skuRevMap[li.sku].totalQty  += qty;
+          }
           const t = (li.title || '').trim();
-          if (!t) return;
-          if (!orderAvgSP[t]) orderAvgSP[t] = { totalRev: 0, totalQty: 0 };
-          orderAvgSP[t].totalRev += parseFloat(li.price || 0) * parseInt(li.quantity || 1);
-          orderAvgSP[t].totalQty += parseInt(li.quantity || 1);
+          if (t) {
+            if (!nameRevMap[t]) nameRevMap[t] = { totalRev: 0, totalQty: 0 };
+            nameRevMap[t].totalRev += price * qty;
+            nameRevMap[t].totalQty += qty;
+          }
         });
       });
-      // Also try partial/exact title match for products whose title slightly differs
-      function findAvgSP(productTitle) {
-        const ptLower = productTitle.toLowerCase().trim();
-        // Exact match first
-        if (orderAvgSP[productTitle]) {
-          const d = orderAvgSP[productTitle];
-          return d.totalQty > 0 ? Math.round(d.totalRev / d.totalQty) : null;
-        }
-        // Case-insensitive exact
-        const exactKey = Object.keys(orderAvgSP).find(k => k.toLowerCase().trim() === ptLower);
-        if (exactKey) {
-          const d = orderAvgSP[exactKey];
-          return d.totalQty > 0 ? Math.round(d.totalRev / d.totalQty) : null;
-        }
-        // Partial match
-        const partialKey = Object.keys(orderAvgSP).find(k =>
-          k.toLowerCase().trim().includes(ptLower) || ptLower.includes(k.toLowerCase().trim())
-        );
-        if (partialKey) {
-          const d = orderAvgSP[partialKey];
-          return d.totalQty > 0 ? Math.round(d.totalRev / d.totalQty) : null;
-        }
+
+      function avgForSku(sku, productTitle) {
+        if (skuRevMap[sku] && skuRevMap[sku].totalQty > 0)
+          return { avg: Math.round(skuRevMap[sku].totalRev / skuRevMap[sku].totalQty), qty: skuRevMap[sku].totalQty };
+        const tl = (productTitle || '').toLowerCase().trim();
+        const k  = Object.keys(nameRevMap).find(k2 => k2.toLowerCase().trim() === tl);
+        if (k && nameRevMap[k].totalQty > 0)
+          return { avg: Math.round(nameRevMap[k].totalRev / nameRevMap[k].totalQty), qty: nameRevMap[k].totalQty };
         return null;
       }
 
-      const groupedTitles = Object.keys(grouped).sort();
+      function spCell(sku, productTitle, cp, shipping, isHidden) {
+        if (isHidden) return `<span style="color:var(--text-muted);">—</span>`;
+        const d = avgForSku(sku, productTitle);
+        if (!d) return `<span style="color:var(--text-muted);font-size:12px;font-style:italic;">No sales yet</span>`;
+        const margin = d.avg > 0 ? Math.round(((d.avg - cp - shipping) / d.avg) * 100) : null;
+        const mc = margin === null ? '#6b7280' : margin >= 30 ? '#34d399' : margin >= 0 ? '#fbbf24' : '#f87171';
+        const mb = margin !== null ? `<span style="font-size:10px;color:${mc};font-weight:700;background:${mc}22;padding:2px 6px;border-radius:4px;margin-left:5px;">${margin>=0?'+':''}${margin}%</span>` : '';
+        return `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px;">
+          <span style="font-size:14px;font-weight:600;color:white;">₹${d.avg.toLocaleString('en-IN')}</span>${mb}
+        </div><div style="font-size:10px;color:var(--text-muted);margin-top:2px;">avg · ${d.qty} units sold</div>`;
+      }
+
       const pricingMeta = JSON.parse(localStorage.getItem('pricingMeta') || '{}');
 
-      groupedTitles.forEach(title => {
+      Object.keys(grouped).sort().forEach(title => {
         const group = grouped[title];
-        const isHidden = group.skus.every(sku => window.hiddenPricingSKUs.has(sku));
-        const rowOpacity = isHidden ? '0.4' : '1';
-        
-        const skuListHtml = group.skus.length === 1 
-            ? `<div style="font-size:11px; color:var(--text-muted);">${group.skus[0].startsWith('TITLE:') ? '(No SKU)' : group.skus[0]}</div>`
-            : `<div style="font-size:11px; color:var(--text-muted);">${group.skus.length} variants</div>`;
-            
-        const encTitle = encodeURIComponent(title).replace(/'/g, "%27");
-        const meta = pricingMeta[title] || {};
-        const imageUrl = meta.image || '';
-        const status = meta.status || 'draft';
-        
-        let statusHtml = '';
-        if (status === 'active') {
-            statusHtml = `<span style="background: rgba(167, 243, 208, 0.8); color: #065f46; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;">Active</span>`;
-        } else if (status === 'draft') {
-            statusHtml = `<span style="background: rgba(191, 219, 254, 0.8); color: #1e3a8a; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;">Draft</span>`;
-        } else if (status === 'archived') {
-            statusHtml = `<span style="background: rgba(254, 202, 202, 0.8); color: #991b1b; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;">Archived</span>`;
-        } else {
-            statusHtml = `<span style="background: rgba(228, 228, 231, 0.2); color: #a1a1aa; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: capitalize;">${status}</span>`;
-        }
-        
-        const imgHtml = imageUrl 
-             ? `<img src="${imageUrl}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover; border: 1px solid rgba(255,255,255,0.1);">`
-             : `<div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--text-muted);">📦</div>`;
+        const meta      = pricingMeta[title] || {};
+        const imageUrl  = meta.image  || '';
+        const status    = meta.status || 'draft';
+        const encTitle  = encodeURIComponent(title).replace(/'/g, '%27');
+        const isGroupHidden = group.skus.every(s => window.hiddenPricingSKUs.has(s));
 
-        // Build the auto avg sale price cell
-        const avgSP = findAvgSP(title);
-        let spCellHtml;
-        if (isHidden) {
-          spCellHtml = `<span style="color:var(--text-muted); font-size:13px;">—</span>`;
-        } else if (avgSP !== null) {
-          const totalSold = (orderAvgSP[title] || Object.values(orderAvgSP).find((_, i) => Object.keys(orderAvgSP)[i].toLowerCase().trim() === title.toLowerCase().trim()) || {}).totalQty || '?';
-          const margin = (group.cp + group.shipping) > 0 && avgSP > 0
-            ? Math.round(((avgSP - group.cp - group.shipping) / avgSP) * 100)
-            : null;
-          const marginColor = margin === null ? 'var(--text-muted)' : margin >= 30 ? '#34d399' : margin >= 0 ? '#fbbf24' : '#f87171';
-          const marginHtml = margin !== null
-            ? `<span style="font-size:10px; color:${marginColor}; font-weight:700; margin-left:6px; background:${marginColor}22; padding:2px 6px; border-radius:4px;">${margin >= 0 ? '+' : ''}${margin}%</span>`
-            : '';
-          spCellHtml = `
-            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:2px;">
-              <span style="font-size:15px; font-weight:600; color:white;">₹${avgSP.toLocaleString('en-IN')}</span>
-              ${marginHtml}
-            </div>
-            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">avg · ${totalSold} units sold</div>`;
-        } else {
-          spCellHtml = `<span style="color:var(--text-muted); font-size:12px; font-style:italic;">No sales yet</span>`;
-        }
+        const statusMap = {
+          active:   ['rgba(167,243,208,0.85)','#065f46'],
+          draft:    ['rgba(191,219,254,0.85)','#1e3a8a'],
+          archived: ['rgba(254,202,202,0.85)','#991b1b']
+        };
+        const [sbg, stx] = statusMap[status] || ['rgba(228,228,231,0.2)','#a1a1aa'];
+        const statusHtml = `<span style="background:${sbg};color:${stx};padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:capitalize;">${status}</span>`;
+        const imgHtml = imageUrl
+          ? `<img src="${imageUrl}" style="width:42px;height:42px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,0.1);">`
+          : `<div style="width:42px;height:42px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;">📦</div>`;
 
-        const row = document.createElement('tr');
-        row.style.opacity = rowOpacity;
-        row.innerHTML = `
-          <td data-label="Product">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              ${imgHtml}
-              <div>
-                <div style="font-weight:600; color:white; margin-bottom: 2px;">${title}</div>
-                ${skuListHtml}
+        if (group.skus.length === 1) {
+          // ── Single variant row ────────────────────────────────
+          const sku      = group.skus[0];
+          const p        = state.productPricing[sku];
+          const isHidden = window.hiddenPricingSKUs.has(sku);
+          const encSku   = encodeURIComponent(sku).replace(/'/g, '%27');
+          const skuLabel = sku.startsWith('TITLE:') ? '(No SKU)' : sku;
+
+          const row = document.createElement('tr');
+          row.style.opacity = isHidden ? '0.4' : '1';
+          row.innerHTML = `
+            <td style="padding:13px 16px;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                ${imgHtml}
+                <div>
+                  <div style="font-weight:600;color:white;margin-bottom:2px;">${title}</div>
+                  <div style="font-size:11px;color:var(--text-muted);">${skuLabel}</div>
+                </div>
               </div>
-            </div>
-          </td>
-          <td data-label="Status">${statusHtml}</td>
-          <td data-label="Cost Price (CP)"><input type="number" class="inline-input pricing-input" data-title="${encTitle}" data-field="cp" value="${group.cp}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
-          <td data-label="Avg. Sale Price">${spCellHtml}</td>
-          <td data-label="Shipping/Fulfillment"><input type="number" class="inline-input pricing-input" data-title="${encTitle}" data-field="shipping" value="${group.shipping}" style="width:120px;" ${isHidden ? 'disabled' : ''}></td>
-          <td data-label="Action">
-            <div style="display: flex; gap: 6px;">
-              <button class="expand-btn" onclick="saveGroupPricing('${encTitle}')" ${isHidden ? 'disabled' : ''}>Save</button>
-              <button class="expand-btn" onclick="toggleHideGroup('${encTitle}')" style="color:var(--text-muted);" title="Toggle visibility">
-                ${isHidden ? 'Unhide' : 'Hide'}
-              </button>
-            </div>
-          </td>
-        `;
-        tbody.appendChild(row);
+            </td>
+            <td>${statusHtml}</td>
+            <td><input type="number" class="inline-input pricing-input" data-sku="${encSku}" data-title="${encTitle}" data-field="cp" value="${p.cp}" style="width:110px;" ${isHidden?'disabled':''}></td>
+            <td>${spCell(sku, title, p.cp, p.shipping, isHidden)}</td>
+            <td><input type="number" class="inline-input pricing-input" data-sku="${encSku}" data-title="${encTitle}" data-field="shipping" value="${p.shipping}" style="width:110px;" ${isHidden?'disabled':''}></td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <button class="expand-btn" onclick="saveSKUPricing('${encSku}')" ${isHidden?'disabled':''}>Save</button>
+                <button class="expand-btn" onclick="toggleHideGroup('${encTitle}')" style="color:var(--text-muted);">${isHidden?'Unhide':'Hide'}</button>
+              </div>
+            </td>`;
+          tbody.appendChild(row);
+
+        } else {
+          // ── Multi-variant: product header + sub-rows ──────────
+          const hdr = document.createElement('tr');
+          hdr.style.background = 'rgba(255,255,255,0.028)';
+          hdr.innerHTML = `
+            <td colspan="6" style="padding:11px 16px;border-bottom:1px solid rgba(255,255,255,0.06);">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  ${imgHtml}
+                  <div>
+                    <div style="font-weight:700;color:white;font-size:14px;">${title}</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:1px;">${group.skus.length} variants</div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  ${statusHtml}
+                  <button class="expand-btn" onclick="toggleHideGroup('${encTitle}')" style="color:var(--text-muted);font-size:11px;">${isGroupHidden?'Unhide All':'Hide All'}</button>
+                </div>
+              </div>
+            </td>`;
+          tbody.appendChild(hdr);
+
+          group.skus.forEach(sku => {
+            const p        = state.productPricing[sku];
+            const isHidden = window.hiddenPricingSKUs.has(sku);
+            const encSku   = encodeURIComponent(sku).replace(/'/g, '%27');
+            const vLabel   = (p.variantTitle && p.variantTitle !== 'Default Title')
+              ? p.variantTitle
+              : (sku.startsWith('TITLE:') ? '(No SKU)' : sku);
+
+            const vRow = document.createElement('tr');
+            vRow.style.opacity    = isHidden ? '0.35' : '1';
+            vRow.style.background = 'rgba(0,0,0,0.15)';
+            vRow.innerHTML = `
+              <td style="padding:11px 16px 11px 40px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="color:rgba(255,255,255,0.2);font-size:16px;line-height:1;">└</span>
+                  <div>
+                    <div style="font-weight:600;color:#e4e4e7;font-size:13px;">${vLabel}</div>
+                    <div style="font-size:10px;color:var(--text-muted);margin-top:1px;">${sku.startsWith('TITLE:')?'(No SKU)':sku}</div>
+                  </div>
+                </div>
+              </td>
+              <td></td>
+              <td><input type="number" class="inline-input pricing-input" data-sku="${encSku}" data-title="${encTitle}" data-field="cp" value="${p.cp}" style="width:110px;" ${isHidden?'disabled':''}></td>
+              <td>${spCell(sku, title, p.cp, p.shipping, isHidden)}</td>
+              <td><input type="number" class="inline-input pricing-input" data-sku="${encSku}" data-title="${encTitle}" data-field="shipping" value="${p.shipping}" style="width:110px;" ${isHidden?'disabled':''}></td>
+              <td>
+                <button class="expand-btn" onclick="saveSKUPricing('${encSku}')" ${isHidden?'disabled':''} style="margin:0;">Save</button>
+              </td>`;
+            tbody.appendChild(vRow);
+          });
+        }
       });
 
-      // Add event listeners to inputs to update state on change (blur-triggered)
+      // Per-SKU input change listener
       document.querySelectorAll('.pricing-input').forEach(input => {
-        input.addEventListener('change', (e) => {
-          const title = decodeURIComponent(e.target.dataset.title);
+        input.addEventListener('change', e => {
+          const sku   = decodeURIComponent(e.target.dataset.sku || '');
           const field = e.target.dataset.field;
-          const val = parseFloat(e.target.value) || 0;
-          if (grouped[title]) {
-             grouped[title].skus.forEach(sku => {
-                state.productPricing[sku][field] = val;
-             });
+          const val   = parseFloat(e.target.value) || 0;
+          if (sku && state.productPricing[sku]) {
+            state.productPricing[sku][field] = val;
           }
         });
       });
     }
+
+    // Save a single SKU's pricing (used by per-variant Save buttons)
+    window.saveSKUPricing = async function(encodedSku) {
+      if (!sbClient) return;
+      const sku = decodeURIComponent(encodedSku);
+      // Flush the DOM inputs for this specific SKU first
+      document.querySelectorAll(`.pricing-input[data-sku="${encodedSku}"]`).forEach(input => {
+        const field = input.dataset.field;
+        const val   = parseFloat(input.value) || 0;
+        if (state.productPricing[sku]) state.productPricing[sku][field] = val;
+      });
+      const p = state.productPricing[sku];
+      if (!p) return;
+      showLoading('Saving...');
+      try {
+        const { error } = await sbClient.from('product_pricing').upsert([{
+          sku,
+          product_title:  p.title,
+          variant_title:  p.variantTitle || null,
+          cost_price:     p.cp,
+          selling_price:  p.sp,
+          shipping_charge: p.shipping,
+          updated_at:     new Date().toISOString()
+        }]);
+        if (error) throw error;
+        log(`Pricing saved for SKU: ${sku}`);
+        const btn = document.querySelector(`button[onclick="saveSKUPricing('${encodedSku}')"]`);
+        flashBtn(btn, '✓ Saved');
+        if (state.view && state.view !== 'pricing') renderCurrentView();
+      } catch(e) {
+        log('Error saving SKU pricing: ' + e.message);
+        alert('Save failed: ' + e.message);
+      } finally {
+        hideLoading();
+      }
+    };
 
     // Helper: flush ALL pricing input values currently in DOM into state.productPricing
     // This ensures values are captured even if the user never blurred/changed the input.
@@ -3017,6 +3102,7 @@
         const rows = Object.entries(state.productPricing).map(([sku, p]) => ({
           sku,
           product_title: p.title,
+          variant_title: p.variantTitle || null,
           cost_price: p.cp,
           selling_price: p.sp,
           shipping_charge: p.shipping,
@@ -3071,6 +3157,7 @@
           return {
             sku,
             product_title: p.title,
+            variant_title: p.variantTitle || null,
             cost_price: p.cp,
             selling_price: p.sp,
             shipping_charge: p.shipping,
