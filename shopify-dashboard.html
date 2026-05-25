@@ -3905,8 +3905,8 @@
           if (o.line_items) o.line_items.forEach(li => {
             let qty = parseInt(li.quantity || 1);
             totalItemsCount += qty;
-            let name = li.title || 'Unknown Item';
-            if (li.variant_title && li.variant_title !== 'Default Title') {
+            let name = li.name || li.title || 'Unknown Item';
+            if (name === li.title && li.variant_title && li.variant_title !== 'Default Title') {
                name += ' — ' + li.variant_title;
             }
             itemBreakdownMap[name] = (itemBreakdownMap[name] || 0) + qty;
@@ -4328,8 +4328,8 @@
       allViewItems.forEach(li => {
         let qty = parseInt(li.quantity || 1);
         weeklyTotalItems += qty;
-        let name = li.title || 'Unknown Item';
-        if (li.variant_title && li.variant_title !== 'Default Title') {
+        let name = li.name || li.title || 'Unknown Item';
+        if (name === li.title && li.variant_title && li.variant_title !== 'Default Title') {
            name += ' — ' + li.variant_title;
         }
         weeklyItemBreakdownMap[name] = (weeklyItemBreakdownMap[name] || 0) + qty;
@@ -4449,8 +4449,8 @@
       allItems.forEach(li => {
         let qty = parseInt(li.quantity || 1);
         monthlyTotalItems += qty;
-        let name = li.title || 'Unknown Item';
-        if (li.variant_title && li.variant_title !== 'Default Title') {
+        let name = li.name || li.title || 'Unknown Item';
+        if (name === li.title && li.variant_title && li.variant_title !== 'Default Title') {
            name += ' — ' + li.variant_title;
         }
         monthlyItemBreakdownMap[name] = (monthlyItemBreakdownMap[name] || 0) + qty;
@@ -4607,8 +4607,8 @@
       allItems.forEach(li => {
         let qty = parseInt(li.quantity || 1);
         allTimeTotalItems += qty;
-        let name = li.title || 'Unknown Item';
-        if (li.variant_title && li.variant_title !== 'Default Title') {
+        let name = li.name || li.title || 'Unknown Item';
+        if (name === li.title && li.variant_title && li.variant_title !== 'Default Title') {
            name += ' — ' + li.variant_title;
         }
         allTimeItemBreakdownMap[name] = (allTimeItemBreakdownMap[name] || 0) + qty;
