@@ -2681,6 +2681,56 @@
       `;
     }
 
+    // Re-render the currently active view using already-loaded in-memory data.
+    // Called after pricing is saved so PnL updates retrospectively without a network re-fetch.
+    function renderCurrentView() {
+      const v = state.view;
+      if (!v || v === 'pricing') return;
+
+      try {
+        if (v === 'sheet') {
+          renderSheet();
+        } else if (v === 'products') {
+          const s = document.getElementById('products-start-date').value;
+          const e = document.getElementById('products-end-date').value;
+          if (s && e) renderProducts(
+            new Date(s + 'T00:00:00+05:30').toISOString(),
+            new Date(e + 'T23:59:59+05:30').toISOString()
+          );
+        } else if (v === 'daily') {
+          const s = document.getElementById('daily-start-date').value;
+          const e = document.getElementById('daily-end-date').value;
+          if (s && e) renderDaily(s, e);
+          // Also refresh the scoreboard if visible
+          const sStart = document.getElementById('scoreboard-start-date').value;
+          const sEnd   = document.getElementById('scoreboard-end-date').value;
+          if (sStart && sEnd) renderScoreboard(parseDateStr(sStart), parseDateStr(sEnd));
+        } else if (v === 'weekly') {
+          const wDate = new Date(document.getElementById('weekly-date').value);
+          const wStart = getWeekStart(wDate);
+          const wEnd   = new Date(wStart); wEnd.setDate(wEnd.getDate() + 6);
+          renderWeekly(wStart, wEnd);
+        } else if (v === 'monthly') {
+          const y = parseInt(document.getElementById('monthly-year').value);
+          const m = parseInt(document.getElementById('monthly-month').value);
+          renderMonthly(new Date(y, m, 1), new Date(y, m + 1, 0));
+        } else if (v === 'all-time') {
+          const fromVal = document.getElementById('all-time-from').value || STORE_LAUNCH_DATE;
+          const toVal   = document.getElementById('all-time-to').value   || toDateStr(new Date());
+          renderAllTime(parseDateStr(fromVal), parseDateStr(toVal), 'all-time');
+        } else if (v === 'analytics') {
+          const s = document.getElementById('analytics-start-date').value;
+          const e = document.getElementById('analytics-end-date').value;
+          if (s && e) renderAnalytics(
+            new Date(s + 'T00:00:00+05:30').toISOString(),
+            new Date(e + 'T23:59:59+05:30').toISOString()
+          );
+        }
+      } catch(err) {
+        console.error('renderCurrentView error:', err);
+      }
+    }
+
     // PRICING MANAGEMENT LOGIC
     async function fetchPricing() {
       if (!sbClient) return;
@@ -2815,7 +2865,7 @@
         tbody.appendChild(row);
       });
 
-      // Add event listeners to inputs to update state
+      // Add event listeners to inputs to update state on change (blur-triggered)
       document.querySelectorAll('.pricing-input').forEach(input => {
         input.addEventListener('change', (e) => {
           const title = decodeURIComponent(e.target.dataset.title);
@@ -2830,8 +2880,43 @@
       });
     }
 
+    // Helper: flush ALL pricing input values currently in DOM into state.productPricing
+    // This ensures values are captured even if the user never blurred/changed the input.
+    function flushPricingInputsToState() {
+      document.querySelectorAll('.pricing-input').forEach(input => {
+        const title = decodeURIComponent(input.dataset.title);
+        const field = input.dataset.field;
+        const val = parseFloat(input.value) || 0;
+        // Find all SKUs that belong to this product title and update them
+        Object.keys(state.productPricing).forEach(sku => {
+          if (state.productPricing[sku].title === title) {
+            state.productPricing[sku][field] = val;
+          }
+        });
+      });
+    }
+
+    // Helper: show a brief success flash on a button
+    function flashBtn(btn, msg = '✓ Saved') {
+      if (!btn) return;
+      const orig = btn.textContent;
+      const origBg = btn.style.background;
+      btn.textContent = msg;
+      btn.style.background = 'rgba(52,211,153,0.3)';
+      btn.disabled = true;
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.style.background = origBg;
+        btn.disabled = false;
+      }, 1800);
+    }
+
     async function savePricing() {
       if (!sbClient) return;
+
+      // Step 1: flush any unsaved input values (user may not have blurred the fields)
+      flushPricingInputsToState();
+
       showLoading('Saving all product pricing...');
       try {
         const rows = Object.entries(state.productPricing).map(([sku, p]) => ({
@@ -2846,6 +2931,16 @@
         const { error } = await sbClient.from('product_pricing').upsert(rows);
         if (error) throw error;
         log("Product pricing saved successfully.");
+
+        // Step 2: flash success feedback
+        flashBtn(document.getElementById('btn-save-pricing'), '✓ All Saved!');
+
+        // Step 3: re-render the active non-pricing view so PnL recalculates
+        // We don't force a network sync — just re-render with fresh pricing in state.
+        const prevView = state.view;
+        if (prevView && prevView !== 'pricing') {
+          renderCurrentView();
+        }
       } catch (e) {
         log("Error saving pricing: " + e.message);
         alert("Save failed: " + e.message);
@@ -2857,8 +2952,23 @@
     async function saveGroupPricing(encodedTitle) {
       if (!sbClient) return;
       const title = decodeURIComponent(encodedTitle);
+
+      // Step 1: flush input values for THIS group from the DOM into state
+      // (user may not have blurred the inputs before clicking Save)
+      document.querySelectorAll('.pricing-input').forEach(input => {
+        const inputTitle = decodeURIComponent(input.dataset.title);
+        if (inputTitle !== title) return;
+        const field = input.dataset.field;
+        const val = parseFloat(input.value) || 0;
+        Object.keys(state.productPricing).forEach(sku => {
+          if (state.productPricing[sku].title === title) {
+            state.productPricing[sku][field] = val;
+          }
+        });
+      });
+
       const skusToSave = Object.keys(state.productPricing).filter(sku => state.productPricing[sku].title === title);
-      
+
       showLoading('Saving pricing...');
       try {
         const rows = skusToSave.map(sku => {
@@ -2874,9 +2984,21 @@
         });
         const { error } = await sbClient.from('product_pricing').upsert(rows);
         if (error) throw error;
-        log(`Pricing for ${title} saved (${skusToSave.length} variants).`);
+        log(`Pricing for "${title}" saved (${skusToSave.length} variants).`);
+
+        // Step 2: flash the row's Save button
+        const encTitle = encodeURIComponent(title).replace(/'/g, "%27");
+        const saveBtn = document.querySelector(`button[onclick="saveGroupPricing('${encTitle}')"]`);
+        flashBtn(saveBtn, '✓ Saved');
+
+        // Step 3: re-render views so PnL updates retrospectively with new pricing
+        // We skip network re-fetch — the in-memory orders + new pricing are enough.
+        if (state.view && state.view !== 'pricing') {
+          renderCurrentView();
+        }
       } catch (e) {
         log("Error saving group pricing: " + e.message);
+        alert('Save failed: ' + e.message);
       } finally {
         hideLoading();
       }
