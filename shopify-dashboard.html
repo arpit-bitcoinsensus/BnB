@@ -2026,6 +2026,30 @@
       return getRevenueBreakdown(orders).totalRevenue;
     }
 
+    // Global 4-step cascade pricing resolver — used in calcPL, renderScoreboard, renderDaily, and the day PNL modal.
+    // 1) Direct SKU match  2) TITLE:<title> key  3) Exact title match (case-insensitive)  4) Partial title match
+    // Returns the pricing object { cp, sp, shipping } or null if no match found.
+    function resolvePricingForItem(li) {
+      const pp = state.productPricing;
+      if (!pp || Object.keys(pp).length === 0) return null;
+      // Step 1: direct SKU key
+      if (li.sku && pp[li.sku]) return pp[li.sku];
+      // Step 2: TITLE: key
+      const titleKey = 'TITLE:' + li.title;
+      if (pp[titleKey]) return pp[titleKey];
+      // Step 3: exact title match (case-insensitive)
+      const liTitle = (li.title || '').toLowerCase().trim();
+      if (!liTitle) return null;
+      const allEntries = Object.values(pp);
+      const exact = allEntries.find(e => e.title && e.title.toLowerCase().trim() === liTitle);
+      if (exact) return exact;
+      // Step 4: partial title match (one contains the other)
+      const partial = allEntries.find(e => e.title && (
+        e.title.toLowerCase().trim().includes(liTitle) || liTitle.includes(e.title.toLowerCase().trim())
+      ));
+      return partial || null;
+    }
+
     function calcPL(revenue, deliveredCount, adCost, fulfilledCount = 0, items = [], totalShopifyRevenue = 0, actualDeliveredCount = null) {
       let totalProductCost = 0;
       let totalLogisticsCost = 0;
@@ -2037,36 +2061,43 @@
       if (items && items.length > 0) {
         // Use items mainly for granular cost attribution
         items.forEach(item => {
-          const lookupKey = item.sku || ('TITLE:' + item.title);
-          const pricing = state.productPricing[lookupKey] || { cp: PRODUCT_COST, sp: item.price || 0, shipping: SHIPPING_COST };
-          const isDelivered = item.isDelivered; 
-          const isFulfilled = item.isFulfilled; 
-          
+          // Use the global 4-step cascade — never silently default to ₹555 if pricing is loaded
+          const resolved = resolvePricingForItem(item);
+          const pricingHasCp = resolved && typeof resolved.cp === 'number';
+          const cp       = pricingHasCp                           ? resolved.cp       : PRODUCT_COST;
+          const shipping = (resolved && typeof resolved.shipping === 'number') ? resolved.shipping : SHIPPING_COST;
+          const isDelivered = item.isDelivered;
+          const isFulfilled = item.isFulfilled;
+          const itemKey = item.sku || ('TITLE:' + item.title);
+
           if (isDelivered) {
-             totalProductCost += (pricing.cp * item.quantity);
-             if (!itemMap[lookupKey]) {
-                itemMap[lookupKey] = {
+             totalProductCost += (cp * item.quantity);
+             if (!itemMap[itemKey]) {
+                itemMap[itemKey] = {
                   name: item.title || 'Unknown Product',
                   price: parseFloat(item.price || 0),
-                  cp: pricing.cp,
+                  cp: cp,
                   qty: 0,
                   totalCP: 0
                 };
              }
-             itemMap[lookupKey].qty += item.quantity;
-             itemMap[lookupKey].totalCP += (pricing.cp * item.quantity);
+             itemMap[itemKey].qty += item.quantity;
+             itemMap[itemKey].totalCP += (cp * item.quantity);
           }
           if (isFulfilled) {
-            totalLogisticsCost += (pricing.shipping * item.quantity);
+            totalLogisticsCost += (shipping * item.quantity);
           }
         });
-        
-        // Safety: If for some reason productCost is 0 but we have deliveries, fallback to default
-        if (totalProductCost === 0 && deliveredCount > 0) {
-           totalProductCost = deliveredCount * PRODUCT_COST;
-        }
-        if (totalLogisticsCost === 0 && (fulfilledCount > 0 || deliveredCount > 0)) {
-           totalLogisticsCost = (fulfilledCount || deliveredCount) * SHIPPING_COST;
+
+        // Safety fallback ONLY when pricing table is completely empty (not yet loaded)
+        const pricingLoaded = Object.keys(state.productPricing || {}).length > 0;
+        if (!pricingLoaded) {
+          if (totalProductCost === 0 && deliveredCount > 0) {
+             totalProductCost = deliveredCount * PRODUCT_COST;
+          }
+          if (totalLogisticsCost === 0 && (fulfilledCount > 0 || deliveredCount > 0)) {
+             totalLogisticsCost = (fulfilledCount || deliveredCount) * SHIPPING_COST;
+          }
         }
 
       } else {
@@ -3507,8 +3538,8 @@
           const isFul = isCountedForCost;
           if (o.line_items) {
             o.line_items.forEach(li => {
-              const lookupKey = li.sku || ('TITLE:' + li.title);
-              allDayItems.push({ ...li, sku: lookupKey, isDelivered: isCountedForCost, isFulfilled: isFul });
+              // Pass original li with its real sku so resolvePricingForItem can cascade correctly
+              allDayItems.push({ ...li, isDelivered: isCountedForCost, isFulfilled: isFul });
             });
           }
         });
@@ -3653,8 +3684,8 @@
           const isFul = isCountedForCost; // only charge shipping when revenue is generated
           if (o.line_items) {
             o.line_items.forEach(li => {
-              const lookupKey = li.sku || ('TITLE:' + li.title);
-              allDayItems.push({ ...li, sku: lookupKey, isDelivered: isCountedForCost, isFulfilled: isFul });
+              // Pass original li with its real sku so resolvePricingForItem can cascade correctly
+              allDayItems.push({ ...li, isDelivered: isCountedForCost, isFulfilled: isFul });
             });
           }
         });
@@ -3882,28 +3913,7 @@
       // All line items for this day
       const dayOrders = window._dayOrdersCache[dateStr] || [];
 
-      // Helper: resolve pricing for a line item using a 4-step cascade
-      // 1) Direct SKU key  2) TITLE: key  3) Scan all pricing by title match  4) Global defaults
-      function resolvePricing(li) {
-        const pp = state.productPricing;
-        // Step 1: direct SKU
-        if (li.sku && pp[li.sku]) return pp[li.sku];
-        // Step 2: TITLE: key
-        const titleKey = 'TITLE:' + li.title;
-        if (pp[titleKey]) return pp[titleKey];
-        // Step 3: scan all entries for a title that matches (case-insensitive substring)
-        const liTitle = (li.title || '').toLowerCase();
-        const allEntries = Object.values(pp);
-        const byTitle = allEntries.find(e => e.title && e.title.toLowerCase() === liTitle);
-        if (byTitle) return byTitle;
-        // Step 3b: partial title match (product title contains line item title or vice versa)
-        const partial = allEntries.find(e => e.title && (
-          e.title.toLowerCase().includes(liTitle) || liTitle.includes(e.title.toLowerCase())
-        ));
-        if (partial) return partial;
-        // Step 4: fallback
-        return null;
-      }
+      // Use the global resolvePricingForItem() for the same 4-step cascade
 
       // Build per-product stats: qty ordered, and revenue from delivered/prepaid orders only
       const productMap = {};
@@ -3912,7 +3922,7 @@
         (o.line_items || []).forEach(li => {
           const key = li.title || 'Unknown';
           if (!productMap[key]) {
-            const pricing = resolvePricing(li);
+            const pricing = resolvePricingForItem(li);
             productMap[key] = {
               title: key,
               sku: li.sku || '',
